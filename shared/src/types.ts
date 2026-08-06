@@ -1,47 +1,24 @@
-export type ResourceId =
-  | 'coal'
-  | 'stone'
-  | 'ironOre'
-  | 'copperOre'
-  | 'crushedIron'
-  | 'crushedCopper'
-  | 'ironIngot'
-  | 'copperIngot'
-  | 'steelIngot';
+export type { ResourceId } from './catalog/resources';
+export type { TechId } from './catalog/techs';
+export type {
+  BuildingType,
+  BuildingId,
+  BuildableType,
+  StationType,
+} from './catalog/buildings';
+export type { Tier } from './catalog/schema';
+export type { RecipeId } from './catalog/recipes';
+
+import type { ResourceId } from './catalog/resources';
+import type { TechId } from './catalog/techs';
+import type { BuildingType, BuildableType, StationType } from './catalog/buildings';
+import type { Tier } from './catalog/schema';
 
 /**
  * Cost bag. The special 'crude' entry is stone-only (legacy alias for tower /
  * repair / gun costs that still use the crude helpers).
  */
 export type Cost = Partial<Record<ResourceId | 'crude', number>>;
-
-export type TechId =
-  | 'sharpPick'
-  | 'cartCapacity'
-  | 'locomotive'
-  | 'bellows'
-  | 'steel'
-  | 'reinforcedWalls';
-
-export type Tier = 'crude' | 'refined';
-
-export type BuildingType =
-  | 'keep'
-  | 'wall'
-  | 'gate'
-  | 'anvil'
-  | 'forge'
-  | 'blastFurnace'
-  | 'techhub'
-  | 'dock'
-  | 'towerArrow'
-  | 'towerBallista';
-
-/** Buildings the player can raise from the build menu. */
-export type BuildableType = 'towerArrow' | 'towerBallista' | 'blastFurnace';
-
-/** Hand-worked refining stations whose output the player picks. */
-export type StationType = 'anvil' | 'forge';
 
 export type EnemyKind = 'runner' | 'brute';
 export type NodeKind = 'iron' | 'copper' | 'coal';
@@ -171,6 +148,8 @@ export interface WorldState {
   nextId: number;
   gameOver: boolean;
   nightsSurvived: number;
+  /** Cheat mode: free + instant build/research (solo/dev). */
+  debug: boolean;
 }
 
 export type SimEvent =
@@ -210,7 +189,8 @@ export type Intent =
   /** Scroll wheel at the station the player is standing at. */
   | { type: 'cycleRecipe'; dir: number }
   | { type: 'upgradeFurnace' }
-  | { type: 'upgradeTower'; buildingId: string };
+  | { type: 'upgradeTower'; buildingId: string }
+  | { type: 'setDebug'; enabled: boolean };
 
 export interface QueuedIntent {
   sid: string;

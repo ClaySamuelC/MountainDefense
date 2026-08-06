@@ -33,6 +33,15 @@ export class LocalTransport implements Transport {
       addPlayer(world, this.myId, 'Miner');
     }
 
+    // Prefer persisted debug preference for fresh runs; keeps continue-from-save as saved.
+    if (this.isFresh) {
+      try {
+        world.debug = localStorage.getItem('md-debug') === '1';
+      } catch {
+        world.debug = false;
+      }
+    }
+
     this.sim = new HostSim(world);
     this.timer = window.setInterval(() => this.step(), 1000 * DT);
 
@@ -49,6 +58,14 @@ export class LocalTransport implements Transport {
         const p = this.sim.world.players.find((pl) => pl.id === this.myId) ?? this.sim.world.players[0];
         p.x = x;
         p.z = z;
+      },
+      debug: (on = true) => {
+        this.sim.world.debug = !!on;
+        try {
+          localStorage.setItem('md-debug', on ? '1' : '0');
+        } catch {
+          /* ignore */
+        }
       },
       save: () => this.save(),
     };

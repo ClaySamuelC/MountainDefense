@@ -30,6 +30,9 @@ import {
   WALL_REBUILD_COST,
   WALL_REBUILD_TIME,
   findRecipe,
+  recipeUnlocked,
+  stationRecipeId,
+  stat,
 } from './constants';
 import { railPosAt } from './rail';
 import { getContext, hasInputs } from './context';
@@ -188,11 +191,12 @@ export function tickPlayers(w: WorldState, inputs: Map<string, PlayerInput>, ev:
       p.beatHit = false;
     }
 
-    const pickSpeed = (w.techs.sharpPick.unlocked ? 1.6 : 1) / Math.max(1, p.beatPenalty);
+    const mineSpeed = stat(w, 'mineWorkSpeed') / Math.max(1, p.beatPenalty);
+    const anvilSpeed = stat(w, 'anvilWorkSpeed') / Math.max(1, p.beatPenalty);
 
     switch (ctx.kind) {
       case 'mine': {
-        p.workT += DT * pickSpeed;
+        p.workT += DT * mineSpeed;
         if (p.workT >= MINE_TIME) {
           finishSwing(w, p, ctx, ev, () => {
             const node = w.nodes.find((nd) => nd.id === ctx.nodeId);
@@ -237,11 +241,13 @@ export function tickPlayers(w: WorldState, inputs: Map<string, PlayerInput>, ev:
       }
       case 'anvil': {
         if (!ctx.ready) break;
-        p.workT += DT * pickSpeed;
+        p.workT += DT * anvilSpeed;
         if (p.workT >= BREAK_TIME) {
           const anvil = w.buildings.find((b) => b.type === 'anvil');
           finishSwing(w, p, ctx, ev, () => {
             const recipe = findRecipe('anvil', ctx.recipe);
+            const rid = stationRecipeId('anvil', ctx.recipe);
+            if (rid && !recipeUnlocked(w, rid)) return false;
             if (!hasInputs(w, recipe.inputs)) return false;
             pay(w, recipe.inputs);
             w.stockpile[recipe.out]++;
@@ -279,7 +285,7 @@ export function tickPlayers(w: WorldState, inputs: Map<string, PlayerInput>, ev:
       case 'repair': {
         const b = w.buildings.find((bb) => bb.id === ctx.buildingId);
         if (b && b.hp > 0 && b.hp < b.maxHp) {
-          const costMul = w.techs.reinforcedWalls.unlocked ? 0.5 : 1;
+          const costMul = stat(w, 'repairCost');
           const hpGain = Math.min(REPAIR_RATE * DT, b.maxHp - b.hp);
           const cost = hpGain * REPAIR_ORE_PER_HP * costMul;
           if (crudeStock(w) >= cost) {

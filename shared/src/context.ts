@@ -20,6 +20,11 @@ import {
   WALL_REBUILD_COST,
   YARD_RADIUS,
   findRecipe,
+  getBuilding,
+  isChargeBuilding,
+  isFortification,
+  recipeUnlocked,
+  stationRecipeId,
 } from './constants';
 import { RAIL_LENGTH, railPosAt } from './rail';
 export type WorkContext =
@@ -74,10 +79,14 @@ function stationContext(
   station: StationType,
 ): Extract<WorkContext, { kind: 'anvil' | 'forge' }> {
   const recipe = findRecipe(station, b.recipe);
-  const ready = hasInputs(w, recipe.inputs);
-  const label = ready
-    ? recipe.verb
-    : `Need ${inputSummary(recipe.inputs)} to ${recipe.verb.toLowerCase()}`;
+  const rid = stationRecipeId(station, recipe.out);
+  const unlocked = !rid || recipeUnlocked(w, rid);
+  const ready = unlocked && hasInputs(w, recipe.inputs);
+  const label = !unlocked
+    ? 'Recipe locked — research required'
+    : ready
+      ? recipe.verb
+      : `Need ${inputSummary(recipe.inputs)} to ${recipe.verb.toLowerCase()}`;
   return { kind: station, station, recipe: recipe.out, ready, label };
 }
 
@@ -123,7 +132,7 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
     let best: BuildingState | null = null;
     let bd = REACH_REPAIR;
     for (const b of w.buildings) {
-      if (b.type !== 'wall' && b.type !== 'gate') continue;
+      if (!isFortification(b.type)) continue;
       if (b.hp <= 0 || b.hp >= b.maxHp) continue;
       const d = dist(p.x, p.z, b.x, b.z);
       if (d < bd) {
@@ -132,14 +141,15 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
       }
     }
     if (best && crudeForRepair(w)) {
-      return { kind: 'repair', buildingId: best.id, label: `Repair ${best.type}` };
+      const name = getBuilding(best.type)?.name ?? best.type;
+      return { kind: 'repair', buildingId: best.id, label: `Repair ${name}` };
     }
   }
   {
     let best: BuildingState | null = null;
     let bd = REACH_REPAIR;
     for (const b of w.buildings) {
-      if (b.type !== 'wall' && b.type !== 'gate') continue;
+      if (!isFortification(b.type)) continue;
       if (b.hp > 0) continue;
       const d = dist(p.x, p.z, b.x, b.z);
       if (d < bd) {
@@ -148,11 +158,12 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
       }
     }
     if (best) {
+      const name = getBuilding(best.type)?.name ?? best.type;
       const cost = best.type === 'gate' ? GATE_REBUILD_COST : WALL_REBUILD_COST;
       const ready = hasInputs(w, cost) || best.buildProgress > 0;
       const label = ready
-        ? `Rebuild ${best.type}`
-        : `Need ${inputSummary(cost)} to rebuild the ${best.type}`;
+        ? `Rebuild ${name}`
+        : `Need ${inputSummary(cost)} to rebuild the ${name.toLowerCase()}`;
       return { kind: 'rebuild', buildingId: best.id, ready, label };
     }
   }
@@ -175,12 +186,12 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
     return stationContext(w, forge, 'forge');
   }
 
-  // 7. Blast furnace: shovel in charges of iron + coal, then walk away
+  // 7. Charge buildings: shovel in charges, then walk away
   {
     let furnace: BuildingState | undefined;
     let bd = REACH_FURNACE;
     for (const b of w.buildings) {
-      if (b.type !== 'blastFurnace' || !stationUsable(b)) continue;
+      if (!isChargeBuilding(b.type) || !stationUsable(b)) continue;
       const d = dist(p.x, p.z, b.x, b.z);
       if (d < bd) {
         bd = d;
@@ -188,13 +199,21 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
       }
     }
     if (furnace) {
-      const full = furnace.charges >= FURNACE_CAP;
-      const ready = !full && hasInputs(w, FURNACE_CHARGE);
-      const label = full
-        ? 'Furnace is fully charged'
-        : ready
-          ? 'Charge the blast furnace'
-          : `Need ${inputSummary(FURNACE_CHARGE)} to charge the furnace`;
+      const def = getBuilding(furnace.type);
+      const cap = def?.industry?.chargeCap ?? FURNACE_CAP;
+      const charge = (def?.industry?.charge as typeof FURNACE_CHARGE) ?? FURNACE_CHARGE;
+      const recipeId = def?.industry?.defaultRecipe ?? def?.industry?.recipes[0];
+      const unlocked = !recipeId || recipeUnlocked(w, recipeId);
+      const full = furnace.charges >= cap;
+      const ready = unlocked && !full && hasInputs(w, charge);
+      const chargeLabel = def?.interact?.label ?? `Charge the ${def?.name ?? 'furnace'}`;
+      const label = !unlocked
+        ? 'Recipe locked — research required'
+        : full
+          ? 'Furnace is fully charged'
+          : ready
+            ? chargeLabel
+            : `Need ${inputSummary(charge)} to charge the furnace`;
       return { kind: 'furnace', buildingId: furnace.id, ready, label };
     }
   }

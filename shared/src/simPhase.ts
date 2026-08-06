@@ -8,6 +8,8 @@ import {
   DT,
   ENEMY_SPAWNS,
   NIGHT_LEN,
+  advancementFromTechs,
+  hasCombat,
 } from './constants';
 
 export function tickPhase(w: WorldState, ev: SimEvent[]) {
@@ -32,11 +34,9 @@ export function tickPhase(w: WorldState, ev: SimEvent[]) {
  * Feeds gentle extra pressure into waves so a strong economy stays contested.
  */
 export function advancement(w: WorldState): number {
-  const techCount = Object.values(w.techs).filter((t) => t.unlocked).length;
-  const towerCount = w.buildings.filter(
-    (b) => b.hp > 0 && (b.type === 'towerArrow' || b.type === 'towerBallista'),
-  ).length;
-  return techCount * ADV_TECH_WEIGHT + towerCount * ADV_TOWER_WEIGHT;
+  const techAdv = advancementFromTechs(w, ADV_TECH_WEIGHT);
+  const towerCount = w.buildings.filter((b) => b.hp > 0 && hasCombat(b.type)).length;
+  return techAdv + towerCount * ADV_TOWER_WEIGHT;
 }
 
 export function scheduleWave(w: WorldState) {

@@ -3,59 +3,56 @@ import type {
   BuildingType,
   NodeKind,
   PlayerState,
-  ResourceId,
   TechId,
   Tier,
   WorldState,
 } from './types';
 import {
+  ANVIL_HP,
+  DOCK_HP,
+  FORGE_HP,
   GATE_HP,
-  GATE_XS,
   KEEP_HP,
   POS,
   STATION_DEFAULT,
   WALL_HP,
   WALL_XS,
   WALL_Z,
+  GATE_XS,
+  assertCatalogValid,
+  emptyStockpile,
+  emptyTechMap,
+  getBuilding,
+  isStation,
 } from './constants';
 import { terrainHeight, terrainSlope } from './terrain';
 import { distToRail, RAIL_LENGTH } from './rail';
 
-export function emptyStockpile(): Record<ResourceId, number> {
-  return {
-    coal: 0,
-    stone: 0,
-    ironOre: 0,
-    copperOre: 0,
-    crushedIron: 0,
-    crushedCopper: 0,
-    ironIngot: 0,
-    copperIngot: 0,
-    steelIngot: 0,
-  };
-}
+export { emptyStockpile };
 
 function building(
   w: WorldState,
   type: BuildingType,
   x: number,
   z: number,
-  hp: number,
+  hp?: number,
   tier: Tier | null = null,
 ): BuildingState {
+  const def = getBuilding(type);
+  const resolvedHp = hp ?? def?.hp ?? 100;
   const b: BuildingState = {
     id: `b${w.nextId++}`,
     type,
     x,
     z,
-    hp,
-    maxHp: hp,
+    hp: resolvedHp,
+    maxHp: resolvedHp,
     tier,
     cd: 0,
     ammo: 0,
     smeltT: 0,
     smelting: null,
-    recipe: type === 'anvil' || type === 'forge' ? STATION_DEFAULT[type] : null,
+    recipe: isStation(type) ? STATION_DEFAULT[type] : null,
     charges: 0,
     level: 1,
     buildProgress: 0,
@@ -92,6 +89,8 @@ export function spawnVein(w: WorldState, kind?: NodeKind): { x: number; z: numbe
 }
 
 export function createWorld(): WorldState {
+  assertCatalogValid();
+
   const w: WorldState = {
     tick: 0,
     time: 0,
@@ -105,19 +104,13 @@ export function createWorld(): WorldState {
     buildings: [],
     enemies: [],
     projectiles: [],
-    techs: {
-      sharpPick: { unlocked: false, progress: 0 },
-      cartCapacity: { unlocked: false, progress: 0 },
-      locomotive: { unlocked: false, progress: 0 },
-      bellows: { unlocked: false, progress: 0 },
-      steel: { unlocked: false, progress: 0 },
-      reinforcedWalls: { unlocked: false, progress: 0 },
-    },
+    techs: emptyTechMap(),
     research: null,
     spawnQueue: [],
     nextId: 1,
     gameOver: false,
     nightsSurvived: 0,
+    debug: false,
   };
 
   // Starting supplies: one crude tower (stone) plus ore to begin refining.
@@ -126,9 +119,9 @@ export function createWorld(): WorldState {
   w.stockpile.stone = 18;
 
   building(w, 'keep', POS.keep.x, POS.keep.z, KEEP_HP);
-  building(w, 'dock', POS.dock.x, POS.dock.z, 250);
-  building(w, 'anvil', POS.anvil.x, POS.anvil.z, 150);
-  building(w, 'forge', POS.forge.x, POS.forge.z, 200);
+  building(w, 'dock', POS.dock.x, POS.dock.z, DOCK_HP);
+  building(w, 'anvil', POS.anvil.x, POS.anvil.z, ANVIL_HP);
+  building(w, 'forge', POS.forge.x, POS.forge.z, FORGE_HP);
   for (const x of WALL_XS) building(w, 'wall', x, WALL_Z, WALL_HP);
   for (const x of GATE_XS) building(w, 'gate', x, WALL_Z, GATE_HP);
 

@@ -4,15 +4,21 @@ import {
   RESOURCE_NAMES,
   STATION_RECIPES,
   TECHS,
+  TECH_BRANCH_LABELS,
+  TECH_IDS,
+  buildOptions,
   buildSpec,
+  buildingUnlocked,
   canAfford,
   furnaceLevel,
   furnaceUpgradeCost,
   hasInputs,
+  techRequiresMet,
   towerCombat,
   towerLevel,
   towerSpec,
   towerUpgradeCost,
+  unlockTechForBuilding,
   type BuildableType,
   type ResourceId,
   type StationType,
@@ -201,19 +207,6 @@ export function FurnacePanel({ w, id }: { w: WorldState; id: string }) {
   );
 }
 
-interface BuildOption {
-  kind: BuildableType;
-  tier: Tier;
-  group: 'defense' | 'industry';
-}
-
-const BUILD_OPTIONS: BuildOption[] = [
-  { kind: 'towerArrow', tier: 'crude', group: 'defense' },
-  { kind: 'towerArrow', tier: 'refined', group: 'defense' },
-  { kind: 'towerBallista', tier: 'refined', group: 'defense' },
-  { kind: 'blastFurnace', tier: 'crude', group: 'industry' },
-];
-
 const BUILD_GROUPS: { id: 'defense' | 'industry'; label: string }[] = [
   { id: 'defense', label: 'Defense' },
   { id: 'industry', label: 'Industry' },
@@ -221,119 +214,137 @@ const BUILD_GROUPS: { id: 'defense' | 'industry'; label: string }[] = [
 
 export function BuildMenu({ ui }: { ui: UIState }) {
   const w = ui.snap!;
+  const options = buildOptions();
   return (
     <div className="panel side-panel">
       <h3>Build</h3>
       {BUILD_GROUPS.map((grp) => (
         <div key={grp.id}>
           <h4>{grp.label}</h4>
-          {BUILD_OPTIONS.filter((o) => o.group === grp.id).map((opt) => {
-            const spec = buildSpec(opt.kind, opt.tier)!;
-            const tower = towerSpec(opt.kind, opt.tier);
-            const locked = spec.needsTech && !w.techs[spec.needsTech].unlocked;
-            const affordable = canAfford(w, spec.cost);
-            const active =
-              ui.buildSel?.kind === opt.kind && ui.buildSel?.tier === opt.tier;
-            return (
-              <button
-                key={`${opt.kind}:${opt.tier}`}
-                className={`card ${locked || !affordable ? 'disabled' : ''} ${active ? 'active' : ''}`}
-                disabled={!!locked}
-                onClick={() =>
-                  store.set({ buildSel: { kind: opt.kind, tier: opt.tier }, buildOpen: false })
-                }
-              >
-                <div className="card-head">
-                  <strong>{spec.name}</strong>
-                  <CostChips cost={spec.cost} w={w} />
-                </div>
-                <p>{locked ? `Requires ${TECHS[spec.needsTech!].name}` : spec.blurb}</p>
-                {tower ? (
-                  <div className="stat-row">
-                    <span>
-                      <em>DMG</em> {tower.dmg}
-                    </span>
-                    <span>
-                      <em>RATE</em> {tower.rate}/s
-                    </span>
-                    <span>
-                      <em>RANGE</em> {tower.range}
-                    </span>
-                    <span>
-                      <em>HP</em> {tower.hp}
-                    </span>
+          {options
+            .filter((o) => o.group === grp.id)
+            .map((opt) => {
+              const spec = buildSpec(opt.kind, opt.tier)!;
+              const tower = towerSpec(opt.kind, opt.tier);
+              const locked = !w.debug && !buildingUnlocked(w, opt.kind);
+              const unlockTech = locked ? unlockTechForBuilding(opt.kind) : null;
+              const affordable = w.debug || canAfford(w, spec.cost);
+              const active =
+                ui.buildSel?.kind === opt.kind && ui.buildSel?.tier === opt.tier;
+              return (
+                <button
+                  key={`${opt.kind}:${opt.tier}`}
+                  className={`card ${locked || !affordable ? 'disabled' : ''} ${active ? 'active' : ''}`}
+                  disabled={!!locked}
+                  onClick={() =>
+                    store.set({ buildSel: { kind: opt.kind, tier: opt.tier }, buildOpen: false })
+                  }
+                >
+                  <div className="card-head">
+                    <strong>{spec.name}</strong>
+                    {w.debug ? <span className="fine">Free</span> : <CostChips cost={spec.cost} w={w} />}
                   </div>
-                ) : (
-                  <div className="stat-row">
-                    <span>
-                      <em>HP</em> {spec.hp}
-                    </span>
-                    <span>
-                      <em>OUTPUT</em> steel, slowly
-                    </span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                  <p>
+                    {locked && unlockTech
+                      ? `Requires ${TECHS[unlockTech].name}`
+                      : spec.blurb}
+                  </p>
+                  {tower ? (
+                    <div className="stat-row">
+                      <span>
+                        <em>DMG</em> {tower.dmg}
+                      </span>
+                      <span>
+                        <em>RATE</em> {tower.rate}/s
+                      </span>
+                      <span>
+                        <em>RANGE</em> {tower.range}
+                      </span>
+                      <span>
+                        <em>HP</em> {tower.hp}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="stat-row">
+                      <span>
+                        <em>HP</em> {spec.hp}
+                      </span>
+                      <span>
+                        <em>OUTPUT</em> steel, slowly
+                      </span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
         </div>
       ))}
       <p className="fine">
-        Towers reload straight from the stockpile. Refined shots go much further per ingot.
+        Towers fire for free. Refined frames hit harder and reach farther.
       </p>
     </div>
   );
 }
 
-const BRANCH_LABEL = { mining: 'Mining & Haul', refining: 'Refining', defense: 'Defense' } as const;
-
 export function TechPanel({ ui }: { ui: UIState }) {
   const w = ui.snap!;
-  const branches: ('mining' | 'refining' | 'defense')[] = ['mining', 'refining', 'defense'];
+  const branches = [...new Set(TECH_IDS.map((id) => TECHS[id].branch))];
   return (
     <div className="panel side-panel wide">
       <h3>Research</h3>
       {branches.map((br) => (
         <div key={br}>
-          <h4>{BRANCH_LABEL[br]}</h4>
-          {(Object.entries(TECHS) as [TechId, (typeof TECHS)[TechId]][])
-            .filter(([, def]) => def.branch === br)
-            .map(([id, def]) => {
-              const t = w.techs[id];
-              const researching = w.research === id;
-              const affordable = canAfford(w, def.cost);
-              const busy = w.research !== null;
-              return (
-                <div key={id} className={`tech-row ${t.unlocked ? 'done' : ''}`}>
-                  <div className="tech-info">
-                    <strong>
-                      {t.unlocked && <span className="tick">✓</span>}
-                      {def.name}
-                    </strong>
-                    <p>{def.desc}</p>
-                    {researching && (
-                      <div className="eff-meter">
-                        <div style={{ width: `${t.progress * 100}%` }} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="tech-side">
-                    <CostChips cost={def.cost} w={w} />
-                    <button
-                      className="btn small"
-                      disabled={t.unlocked || researching || busy || !affordable}
-                      onClick={() => send({ type: 'research', tech: id })}
-                    >
-                      {t.unlocked
-                        ? 'Done'
-                        : researching
-                          ? `${Math.round(t.progress * 100)}%`
-                          : 'Research'}
-                    </button>
-                  </div>
+          <h4>{TECH_BRANCH_LABELS[br] ?? br}</h4>
+          {TECH_IDS.filter((id) => TECHS[id].branch === br).map((id) => {
+            const def = TECHS[id];
+            const t = w.techs[id];
+            const researching = w.research === id;
+            const affordable = w.debug || canAfford(w, def.cost);
+            const busy = !w.debug && w.research !== null;
+            const prereqOk = w.debug || techRequiresMet(w, id);
+            const blocked = !prereqOk && !t.unlocked;
+            const prereqNames = (def.requires ?? [])
+              .filter((r: string) => !w.techs[r as TechId]?.unlocked)
+              .map((r: string) => TECHS[r as TechId]?.name ?? r);
+            return (
+              <div key={id} className={`tech-row ${t.unlocked ? 'done' : ''}`}>
+                <div className="tech-info">
+                  <strong>
+                    {t.unlocked && <span className="tick">✓</span>}
+                    {def.name}
+                  </strong>
+                  <p>
+                    {blocked && prereqNames.length
+                      ? `Requires ${prereqNames.join(', ')}`
+                      : def.desc}
+                  </p>
+                  {researching && (
+                    <div className="eff-meter">
+                      <div style={{ width: `${t.progress * 100}%` }} />
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+                <div className="tech-side">
+                  {w.debug ? <span className="fine">Instant</span> : <CostChips cost={def.cost} w={w} />}
+                  <button
+                    className="btn small"
+                    disabled={t.unlocked || researching || busy || !affordable || !prereqOk}
+                    onClick={() => send({ type: 'research', tech: id })}
+                  >
+                    {t.unlocked
+                      ? 'Done'
+                      : researching
+                        ? `${Math.round(t.progress * 100)}%`
+                        : blocked
+                          ? 'Locked'
+                          : w.debug
+                            ? 'Unlock'
+                            : 'Research'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>

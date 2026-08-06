@@ -1,5 +1,5 @@
 import type { BuildableType, WorldState } from './types';
-import { POS, WALL_Z, YARD_RADIUS } from './constants';
+import { POS, WALL_Z, YARD_RADIUS, getBuilding, hasCombat } from './constants';
 import { terrainSlope } from './terrain';
 import { distToRail } from './rail';
 
@@ -23,11 +23,20 @@ export function placeError(
   if (Math.hypot(x - POS.yard.x, z - POS.yard.z) < YARD_RADIUS + footprint - 1.4) {
     return 'The yard needs room for ore piles';
   }
-  if (kind === 'blastFurnace' && w.buildings.some((b) => b.type === 'blastFurnace' && b.hp > 0)) {
-    return 'One blast furnace is enough — upgrade the one you have';
+  if (kind) {
+    const def = getBuilding(kind);
+    const maxAlive = def?.place?.maxAlive;
+    if (
+      maxAlive != null &&
+      w.buildings.filter((b) => b.type === kind && b.hp > 0).length >= maxAlive
+    ) {
+      const name = def?.name ?? 'building';
+      return `One ${name.toLowerCase()} is enough — upgrade the one you have`;
+    }
   }
   for (const b of w.buildings) {
-    if (b.hp <= 0 && (b.type === 'towerArrow' || b.type === 'towerBallista')) continue;
+    // Ruined towers don't block new builds on the same footprint.
+    if (b.hp <= 0 && hasCombat(b.type)) continue;
     if (Math.hypot(x - b.x, z - b.z) < footprint) return 'Too close to another structure';
   }
   return null;

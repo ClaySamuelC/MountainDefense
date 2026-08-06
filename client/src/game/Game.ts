@@ -16,9 +16,12 @@ import {
   findRecipe,
   furnaceLevel,
   getContext,
+  hasCombat,
   isBeatWork,
+  isChargeBuilding,
   placeError,
   railPosAt,
+  stat,
   terrainHeight,
   towerSpec,
   workDuration,
@@ -403,7 +406,7 @@ export class Game {
     if (!spec) return 'Unknown structure';
     const err = placeError(w, this.ghostPos.x, this.ghostPos.z, spec.footprint, sel.kind);
     if (err) return err;
-    if (!canAfford(w, spec.cost)) return 'Not enough resources';
+    if (!w.debug && !canAfford(w, spec.cost)) return 'Not enough resources';
     return null;
   }
 
@@ -538,11 +541,11 @@ export class Game {
         for (const b of w.buildings) {
           if (b.hp <= 0) continue;
           const d = Math.hypot(ax - b.x, az - b.z);
-          if ((b.type === 'towerArrow' || b.type === 'towerBallista') && d < bestT) {
+          if (hasCombat(b.type) && d < bestT) {
             bestT = d;
             hoverTower = b.id;
           }
-          if (b.type === 'blastFurnace' && d < bestF) {
+          if (isChargeBuilding(b.type) && d < bestF) {
             bestF = d;
             hoverFurnace = b.id;
           }
@@ -556,11 +559,11 @@ export class Game {
       for (const b of w.buildings) {
         if (b.hp <= 0) continue;
         const d = Math.hypot(me.x - b.x, me.z - b.z);
-        if ((b.type === 'towerArrow' || b.type === 'towerBallista') && d < bestT) {
+        if (hasCombat(b.type) && d < bestT) {
           bestT = d;
           nearTower = b.id;
         }
-        if (b.type === 'blastFurnace' && d < bestF) {
+        if (isChargeBuilding(b.type) && d < bestF) {
           bestF = d;
           nearFurnace = b.id;
         }
@@ -638,10 +641,11 @@ export class Game {
       beatHud.active = false;
       return;
     }
+    const workStat = ctx.kind === 'anvil' ? 'anvilWorkSpeed' : 'mineWorkSpeed';
     const speed =
       ctx.kind === 'forge'
         ? 1 / Math.max(1, me.beatPenalty)
-        : (w.techs.sharpPick.unlocked ? 1.6 : 1) / Math.max(1, me.beatPenalty);
+        : stat(w, workStat) / Math.max(1, me.beatPenalty);
     beatHud.active = true;
     beatHud.frac = Math.min(1, me.workT / dur);
     beatHud.rate = speed / dur;

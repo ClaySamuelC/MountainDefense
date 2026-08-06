@@ -7,7 +7,9 @@ import {
   VEIN_LABELS,
   contextReady,
   getContext,
+  getBuilding,
   isBeatWork,
+  isChargeBuilding,
   railPosAt,
   railTangentAt,
   terrainHeight,
@@ -219,13 +221,14 @@ export function syncBuildings(ctx: EntitySyncCtx, w: WorldState) {
     if (!ent) {
       const group = makeBuilding(b.type, b.tier);
       group.position.set(b.x, terrainHeight(b.x, b.z), b.z);
-      const furnace = b.type === 'blastFurnace';
+      const furnace = isChargeBuilding(b.type);
       const hb = makeHealthBar(2.2);
       hb.group.position.y = furnace ? 7.9 : 4.2;
       group.add(hb.group);
       const extra: Record<string, unknown> = {};
       if (furnace) {
-        const pips = makeChargePips(FURNACE_CAP);
+        const cap = getBuilding(b.type)?.industry?.chargeCap ?? FURNACE_CAP;
+        const pips = makeChargePips(cap);
         pips.group.position.y = 7.2;
         group.add(pips.group);
         extra.pips = pips;
@@ -238,8 +241,9 @@ export function syncBuildings(ctx: EntitySyncCtx, w: WorldState) {
     const rubble = ent.group.getObjectByName('rubble');
     if (intact) intact.visible = b.hp > 0;
     if (rubble) rubble.visible = b.hp <= 0;
-    // Fallen walls show rebuild progress on the bar instead of hiding it.
-    if (b.hp <= 0 && (b.type === 'wall' || b.type === 'gate')) {
+    // Fallen fortifications show rebuild progress on the bar instead of hiding it.
+    const fort = !!getBuilding(b.type)?.tags.includes('fortification');
+    if (b.hp <= 0 && fort) {
       ent.hb!.set(Math.max(0.001, b.buildProgress));
       ent.hb!.group.visible = b.buildProgress > 0.001;
     } else {
@@ -254,7 +258,7 @@ export function syncBuildings(ctx: EntitySyncCtx, w: WorldState) {
         m.emissiveIntensity = active ? 1.6 + Math.sin(performance.now() / 90) * 0.5 : 0.35;
       }
     }
-    if (b.type === 'blastFurnace') {
+    if (isChargeBuilding(b.type)) {
       const running = b.smelting !== null && b.hp > 0;
       const tap = ent.group.getObjectByName('furnaceFire') as THREE.Mesh | undefined;
       if (tap) {
@@ -266,13 +270,6 @@ export function syncBuildings(ctx: EntitySyncCtx, w: WorldState) {
       // Smoke from the chimney tells you it is working without a UI panel
       if (running && ent.extra && ent.extra.smokeT % 7 === 0) {
         ctx.particles.burst(b.x + (Math.random() - 0.5) * 0.3, terrainHeight(b.x, b.z) + 6.4, b.z, '#8d8a86', 2, 1.1, 1.5);
-      }
-    }
-    if (b.type === 'techhub') {
-      const crystal = ent.group.getObjectByName('crystal');
-      if (crystal) {
-        crystal.rotation.y += 0.02;
-        crystal.position.y = 4.3 + Math.sin(performance.now() / 600) * 0.15;
       }
     }
   }

@@ -172,7 +172,7 @@ export function killEnemy(w: WorldState, e: EnemyState, ev: SimEvent[]) {
 
 export function tickTowers(w: WorldState) {
   for (const b of w.buildings) {
-    if ((b.type !== 'towerArrow' && b.type !== 'towerBallista') || b.hp <= 0) continue;
+    if (b.hp <= 0) continue;
     const spec = towerCombat(b.type, b.tier, b.level);
     if (!spec) continue;
     b.cd -= DT;
@@ -197,7 +197,7 @@ export function tickTowers(w: WorldState) {
       z: b.z,
       targetId: best.id,
       dmg: spec.dmg,
-      kind: b.tier === 'crude' ? 'stone' : 'bolt',
+      kind: spec.projectile,
     });
   }
 }

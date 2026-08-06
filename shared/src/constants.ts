@@ -1,4 +1,4 @@
-import type { BuildableType, Cost, NodeKind, ResourceId, StationType, TechId, Tier } from './types';
+import type { NodeKind, ResourceId } from './types';
 
 export const TICK_RATE = 20;
 export const DT = 1 / TICK_RATE;
@@ -25,8 +25,6 @@ export const BEAT_EARLY_FORGIVE = 0.12;
 export const BEAT_MISS_PENALTY = 1.55;
 export const BEAT_EARLY_SETBACK = 0.12; // progress lost for hitting way too early
 
-export const CART_CAP_BASE = 12;
-export const CART_CAP_UP = 26;
 /** Push force — raised with the longer mine so the climb stays about as short. */
 export const CART_PUSH = 12;
 export const CART_LOCO_PUSH = 15.5;
@@ -60,340 +58,90 @@ export const REACH_FURNACE = 4.4;
 export const REACH_REPAIR = 3.6;
 export const REACH_MOUNT = 4.2;
 
-export interface TowerSpec {
-  dmg: number;
-  rate: number; // shots per second
-  range: number;
-  hp: number;
-  cost: Cost;
-}
+// Content catalogs — re-exported so existing `@shared` / constants imports keep working.
+export {
+  RESOURCES,
+  RESOURCE_IDS,
+  RESOURCE_NAMES,
+  RESOURCE_SHORT,
+  RESOURCE_HINTS,
+  RESOURCE_STAGE,
+  STAGE_LABELS,
+  RECIPES,
+  RECIPE_IDS,
+  BUILDINGS,
+  BUILDING_IDS,
+  BUILDABLE_TYPES,
+  STATION_TYPES,
+  STATION_RECIPES,
+  STATION_DEFAULT,
+  TECHS,
+  TECH_IDS,
+  TECH_BRANCH_LABELS,
+  FURNACE_CHARGE,
+  FURNACE_CAP,
+  FURNACE_COST,
+  FURNACE_HP,
+  FURNACE_FOOTPRINT,
+  KEEP_HP,
+  WALL_HP,
+  GATE_HP,
+  DOCK_HP,
+  ANVIL_HP,
+  FORGE_HP,
+  buildSpec,
+  buildOptions,
+  getBuilding,
+  hasCombat,
+  isChargeBuilding,
+  isFortification,
+  isStation,
+  isBuildable,
+  dockAutoUnloadRate,
+  towerSpec,
+  towerKey,
+  towerLevels,
+  towerLevel,
+  towerUpgradeCost,
+  towerCombat,
+  furnaceLevel,
+  furnaceLevels,
+  furnaceUpgradeCost,
+  stationRecipes,
+  stationRecipeId,
+  findRecipe,
+  recipeById,
+  recipeIdForOut,
+  emptyStockpile,
+  emptyTechMap,
+  validateCatalog,
+  assertCatalogValid,
+  buildingUnlocked,
+  unlockTechForBuilding,
+  recipeUnlocked,
+  hasFlag,
+  stat,
+  applyTechUnlock,
+  techRequiresMet,
+  advancementFromTechs,
+  collectModifiers,
+} from './catalog';
 
-export const TOWER_SPECS: Record<string, TowerSpec> = {
-  'towerArrow:crude': {
-    dmg: 5,
-    rate: 0.8,
-    range: 13,
-    hp: 120,
-    cost: { stone: 14 },
-  },
-  'towerArrow:refined': {
-    dmg: 9,
-    rate: 1.25,
-    range: 15,
-    hp: 200,
-    cost: { ironIngot: 4 },
-  },
-  'towerBallista:refined': {
-    dmg: 34,
-    rate: 0.45,
-    range: 21,
-    hp: 260,
-    cost: { steelIngot: 3, ironIngot: 2 },
-  },
-};
-
-export function towerSpec(type: string, tier: Tier): TowerSpec | null {
-  return TOWER_SPECS[`${type}:${tier}`] ?? null;
-}
-
-/** Per-tower field upgrades bought on the building (two steps past base). */
-export interface TowerLevel {
-  name: string;
-  dmgMul: number;
-  rateMul: number;
-  rangeMul: number;
-  /** Extra max HP granted when this level is reached. */
-  hpBonus: number;
-  /** Cost to buy this level from the previous one. Absent on level 1. */
-  cost?: Partial<Record<ResourceId, number>>;
-}
-
-export const TOWER_LEVELS: Record<string, TowerLevel[]> = {
-  'towerArrow:crude': [
-    { name: 'Lashed', dmgMul: 1, rateMul: 1, rangeMul: 1, hpBonus: 0 },
-    { name: 'Braced', dmgMul: 1.35, rateMul: 1.1, rangeMul: 1.1, hpBonus: 40, cost: { stone: 12 } },
-    { name: 'Packed', dmgMul: 1.7, rateMul: 1.25, rangeMul: 1.2, hpBonus: 90, cost: { stone: 20 } },
-  ],
-  'towerArrow:refined': [
-    { name: 'Tempered', dmgMul: 1, rateMul: 1, rangeMul: 1, hpBonus: 0 },
-    { name: 'Sighted', dmgMul: 1.25, rateMul: 1.15, rangeMul: 1.2, hpBonus: 50, cost: { ironIngot: 3, stone: 8 } },
-    { name: 'Volley', dmgMul: 1.5, rateMul: 1.4, rangeMul: 1.3, hpBonus: 110, cost: { ironIngot: 5, copperIngot: 2 } },
-  ],
-  'towerBallista:refined': [
-    { name: 'Siege', dmgMul: 1, rateMul: 1, rangeMul: 1, hpBonus: 0 },
-    { name: 'Wound', dmgMul: 1.3, rateMul: 1.1, rangeMul: 1.1, hpBonus: 60, cost: { steelIngot: 2, ironIngot: 2 } },
-    { name: 'Breach', dmgMul: 1.6, rateMul: 1.25, rangeMul: 1.2, hpBonus: 140, cost: { steelIngot: 4, copperIngot: 3 } },
-  ],
-};
-
-export function towerKey(type: string, tier: Tier | null): string {
-  return `${type}:${tier ?? 'crude'}`;
-}
-
-export function towerLevels(type: string, tier: Tier | null): TowerLevel[] {
-  return TOWER_LEVELS[towerKey(type, tier)] ?? TOWER_LEVELS['towerArrow:crude'];
-}
-
-export function towerLevel(type: string, tier: Tier | null, level: number): TowerLevel {
-  const list = towerLevels(type, tier);
-  return list[Math.max(0, Math.min(list.length - 1, level - 1))];
-}
-
-export function towerUpgradeCost(
-  type: string,
-  tier: Tier | null,
-  level: number,
-): Partial<Record<ResourceId, number>> | null {
-  return towerLevels(type, tier)[level]?.cost ?? null;
-}
-
-/** Live combat stats for a tower at its current upgrade level. */
-export function towerCombat(
-  type: string,
-  tier: Tier | null,
-  level: number,
-): { dmg: number; rate: number; range: number } | null {
-  const base = towerSpec(type, tier ?? 'crude');
-  if (!base) return null;
-  const lvl = towerLevel(type, tier, level);
-  return {
-    dmg: base.dmg * lvl.dmgMul,
-    rate: base.rate * lvl.rateMul,
-    range: base.range * lvl.rangeMul,
-  };
-}
-
-// ---------------------------------------------------------------- refining
-
-/**
- * One hand-worked refining recipe. Stations run exactly the recipe the player
- * picked — they never fall back to a different output.
- */
-export interface Recipe {
-  out: ResourceId;
-  inputs: Partial<Record<ResourceId, number>>;
-  /** Short verb phrase for the hold-E prompt. */
-  verb: string;
-}
-
-export const STATION_RECIPES: Record<StationType, Recipe[]> = {
-  anvil: [
-    { out: 'crushedIron', inputs: { ironOre: 1 }, verb: 'Break iron ore' },
-    { out: 'crushedCopper', inputs: { copperOre: 1 }, verb: 'Break copper ore' },
-  ],
-  forge: [
-    { out: 'ironIngot', inputs: { crushedIron: 1, coal: 1 }, verb: 'Smelt iron' },
-    { out: 'copperIngot', inputs: { crushedCopper: 1, coal: 1 }, verb: 'Smelt copper' },
-  ],
-};
-
-export const STATION_DEFAULT: Record<StationType, ResourceId> = {
-  anvil: 'crushedIron',
-  forge: 'ironIngot',
-};
-
-export function stationRecipes(station: StationType): Recipe[] {
-  return STATION_RECIPES[station];
-}
-
-export function findRecipe(station: StationType, out: ResourceId | null): Recipe {
-  const list = STATION_RECIPES[station];
-  return list.find((r) => r.out === out) ?? list[0];
-}
-
-// ---------------------------------------------------------------- blast furnace
-
-/** One charge of the blast furnace: what you shovel in for a single ingot. */
-export const FURNACE_CHARGE: Partial<Record<ResourceId, number>> = { ironIngot: 1, coal: 2 };
-/** Charges the furnace can hold at once. */
-export const FURNACE_CAP = 6;
-export const FURNACE_COST: Cost = { stone: 16, ironIngot: 5 };
-export const FURNACE_HP = 320;
-/** Footprint radius used when placing the furnace. */
-export const FURNACE_FOOTPRINT = 3.2;
-
-export interface FurnaceLevel {
-  name: string;
-  /** Seconds to turn one charge into a steel ingot. */
-  time: number;
-  /** Cost to reach this level from the previous one. Absent on level 1. */
-  upgrade?: Partial<Record<ResourceId, number>>;
-}
-
-/**
- * The furnace runs unattended but starts painfully slow — a trickle of steel
- * you plan around, until you invest in the draught.
- */
-export const FURNACE_LEVELS: FurnaceLevel[] = [
-  { name: 'Cold Draught', time: 48 },
-  { name: 'Forced Air', time: 25, upgrade: { ironIngot: 6, stone: 14 } },
-  { name: 'Hot Blast', time: 11, upgrade: { steelIngot: 3, copperIngot: 6 } },
-];
-
-export function furnaceLevel(level: number): FurnaceLevel {
-  return FURNACE_LEVELS[Math.max(0, Math.min(FURNACE_LEVELS.length - 1, level - 1))];
-}
-
-export function furnaceUpgradeCost(level: number): Partial<Record<ResourceId, number>> | null {
-  return FURNACE_LEVELS[level]?.upgrade ?? null;
-}
-
-export interface BuildSpec {
-  name: string;
-  blurb: string;
-  cost: Cost;
-  hp: number;
-  footprint: number;
-  needsTech?: TechId;
-}
-
-export const BUILD_SPECS: Record<string, BuildSpec> = {
-  'towerArrow:crude': {
-    name: 'Crude Tower',
-    blurb: 'Lashed logs and loose rock. Costs stone. Soft in a fight.',
-    cost: TOWER_SPECS['towerArrow:crude'].cost,
-    hp: TOWER_SPECS['towerArrow:crude'].hp,
-    footprint: 2.4,
-  },
-  'towerArrow:refined': {
-    name: 'Arrow Tower',
-    blurb: 'Smelted iron frame. Faster and harder-hitting than crude.',
-    cost: TOWER_SPECS['towerArrow:refined'].cost,
-    hp: TOWER_SPECS['towerArrow:refined'].hp,
-    footprint: 2.4,
-  },
-  'towerBallista:refined': {
-    name: 'Ballista',
-    blurb: 'Steel-armed siege killer. Built for brutes.',
-    cost: TOWER_SPECS['towerBallista:refined'].cost,
-    hp: TOWER_SPECS['towerBallista:refined'].hp,
-    footprint: 2.4,
-    needsTech: 'steel',
-  },
-  'blastFurnace:crude': {
-    name: 'Blast Furnace',
-    blurb: 'Load iron and coal, then leave it. Slow steel until you upgrade the draught.',
-    cost: FURNACE_COST,
-    hp: FURNACE_HP,
-    footprint: FURNACE_FOOTPRINT,
-    needsTech: 'steel',
-  },
-};
-
-export function buildSpec(kind: BuildableType, tier: Tier): BuildSpec | null {
-  return BUILD_SPECS[`${kind}:${tier}`] ?? null;
-}
-
-export interface TechDef {
-  name: string;
-  desc: string;
-  branch: 'mining' | 'refining' | 'defense';
-  cost: Partial<Record<ResourceId, number>>;
-  time: number;
-}
-
-export const TECHS: Record<TechId, TechDef> = {
-  sharpPick: {
-    name: 'Sharpened Picks',
-    desc: 'Mine and break ore 60% faster',
-    branch: 'mining',
-    cost: { ironIngot: 2 },
-    time: 20,
-  },
-  cartCapacity: {
-    name: 'Deep Hoppers',
-    desc: 'Minecart holds 26 ore (was 12)',
-    branch: 'mining',
-    cost: { ironIngot: 2, copperIngot: 2 },
-    time: 20,
-  },
-  locomotive: {
-    name: 'Locomotive',
-    desc: 'Cart drives itself; dock auto-unloads',
-    branch: 'mining',
-    cost: { steelIngot: 4, copperIngot: 3 },
-    time: 30,
-  },
-  bellows: {
-    name: 'Forge Bellows',
-    desc: 'Smelt 60% faster; keeps a slow burn unattended',
-    branch: 'refining',
-    cost: { ironIngot: 4 },
-    time: 20,
-  },
-  steel: {
-    name: 'Steelworking',
-    desc: 'Blast furnace plans: iron + coal into steel, unattended. Unlocks the Ballista',
-    branch: 'refining',
-    cost: { ironIngot: 3, copperIngot: 3 },
-    time: 25,
-  },
-  reinforcedWalls: {
-    name: 'Reinforced Walls',
-    desc: 'Walls and gate +60% HP; repairs cost half',
-    branch: 'defense',
-    cost: { steelIngot: 3 },
-    time: 25,
-  },
-};
-
-export const RESOURCE_NAMES: Record<ResourceId, string> = {
-  coal: 'Coal',
-  stone: 'Stone',
-  ironOre: 'Iron Ore',
-  copperOre: 'Copper Ore',
-  crushedIron: 'Crushed Iron',
-  crushedCopper: 'Crushed Copper',
-  ironIngot: 'Iron Ingot',
-  copperIngot: 'Copper Ingot',
-  steelIngot: 'Steel Ingot',
-};
-
-/** Short HUD tags so chips stay readable at a glance. */
-export const RESOURCE_SHORT: Record<ResourceId, string> = {
-  coal: 'Coal',
-  stone: 'Stone',
-  ironOre: 'Iron',
-  copperOre: 'Copper',
-  crushedIron: 'Cr.Fe',
-  crushedCopper: 'Cr.Cu',
-  ironIngot: 'Fe bar',
-  copperIngot: 'Cu bar',
-  steelIngot: 'Steel',
-};
-
-/** One-line "what is this for" shown when hovering a resource in the HUD. */
-export const RESOURCE_HINTS: Record<ResourceId, string> = {
-  coal: 'Fuel for the forge and the blast furnace. Mined from coal veins, or scraped off dead monsters.',
-  stone: 'Rubble from mining and refining. Pays for crude towers, gate repairs and stone gun shots. Raw ore cannot substitute.',
-  ironOre: 'Raw rock. Break it at the anvil to get crushed iron.',
-  copperOre: 'Raw rock. Break it at the anvil to get crushed copper.',
-  crushedIron: 'Ready for the forge. Smelt with coal into iron ingots.',
-  crushedCopper: 'Ready for the forge. Smelt with coal into copper ingots.',
-  ironIngot: 'Arrow towers, research, and charges for the blast furnace.',
-  copperIngot: 'Research and furnace upgrades. Nothing else eats it.',
-  steelIngot: 'Ballistas and reinforced walls. Only the blast furnace makes it.',
-};
-
-/** Where a resource sits in the refining chain — used to group the HUD row. */
-export const RESOURCE_STAGE: Record<ResourceId, 'bulk' | 'raw' | 'crushed' | 'ingot'> = {
-  stone: 'bulk',
-  coal: 'bulk',
-  ironOre: 'raw',
-  copperOre: 'raw',
-  crushedIron: 'crushed',
-  crushedCopper: 'crushed',
-  ironIngot: 'ingot',
-  copperIngot: 'ingot',
-  steelIngot: 'ingot',
-};
-
-export const STAGE_LABELS: Record<'bulk' | 'raw' | 'crushed' | 'ingot', string> = {
-  bulk: 'Bulk',
-  raw: 'Raw ore',
-  crushed: 'Crushed',
-  ingot: 'Ingots',
-};
+export type {
+  ResourceDef,
+  RecipeDef,
+  BuildingDef,
+  TechDef,
+  Effect,
+  StatId,
+  FlagId,
+  BuildSpec,
+  TowerSpec,
+  TowerLevel,
+  UpgradeLevel,
+  BuildOption,
+  Recipe,
+} from './catalog';
 
 export const VEIN_LABELS: Record<NodeKind, string> = {
   iron: 'Iron-rich vein',
@@ -403,7 +151,10 @@ export const VEIN_LABELS: Record<NodeKind, string> = {
 
 // What actually comes out of a vein per swing. Iron and copper veins cross-yield
 // each other 25% of the time; coal still sheds stone rubble.
-export const VEIN_YIELDS: Record<NodeKind, { primary: ResourceId; primaryChance: number; stoneChance: number; strays: ResourceId[] }> = {
+export const VEIN_YIELDS: Record<
+  NodeKind,
+  { primary: ResourceId; primaryChance: number; stoneChance: number; strays: ResourceId[] }
+> = {
   iron: { primary: 'ironOre', primaryChance: 0.75, stoneChance: 0, strays: ['copperOre'] },
   copper: { primary: 'copperOre', primaryChance: 0.75, stoneChance: 0, strays: ['ironOre'] },
   coal: { primary: 'coal', primaryChance: 0.8, stoneChance: 0.2, strays: [] },
@@ -420,7 +171,6 @@ export const POS = {
   yard: { x: 3, z: 5 },
   anvil: { x: 8, z: 4.5 },
   forge: { x: 13, z: 8 },
-  techhub: { x: 22, z: 10 },
   mine: { x: -50, z: -50 },
 };
 
@@ -430,9 +180,6 @@ export const POS = {
 export const WALL_Z = 22;
 export const WALL_XS = [4, 12, 20];
 export const GATE_XS = [8, 16];
-export const WALL_HP = 300;
-export const GATE_HP = 420;
-export const KEEP_HP = 600;
 
 export const ENEMY_SPAWNS = [
   { x: 6, z: 46 },

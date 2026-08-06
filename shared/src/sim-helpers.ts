@@ -1,8 +1,8 @@
 import type { Cost, ResourceId, WorldState } from './types';
-import { CART_CAP_BASE, CART_CAP_UP } from './constants';
+import { stat } from './constants';
 
 export function cartCap(w: WorldState): number {
-  return w.techs.cartCapacity.unlocked ? CART_CAP_UP : CART_CAP_BASE;
+  return stat(w, 'cartCap');
 }
 
 export function addRes(
@@ -24,7 +24,7 @@ export function payCrude(w: WorldState, amount: number): void {
   w.stockpile.stone = Math.max(0, w.stockpile.stone - amount);
 }
 
-export function canAfford(w: WorldState, cost: Cost): boolean {
+export function canAfford(w: WorldState, cost: Cost | Partial<Record<string, number>>): boolean {
   for (const [res, amt] of Object.entries(cost)) {
     if (!amt) continue;
     if (res === 'crude') {
@@ -36,7 +36,7 @@ export function canAfford(w: WorldState, cost: Cost): boolean {
   return true;
 }
 
-export function pay(w: WorldState, cost: Cost): void {
+export function pay(w: WorldState, cost: Cost | Partial<Record<string, number>>): void {
   for (const [res, amt] of Object.entries(cost)) {
     if (!amt) continue;
     if (res === 'crude') payCrude(w, amt);

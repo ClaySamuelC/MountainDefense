@@ -1,5 +1,6 @@
 import type {
   BuildableType,
+  Cost,
   PlayerState,
   QueuedIntent,
   ResourceId,
@@ -15,8 +16,15 @@ import {
   REACH_MOUNT,
   STATION_RECIPES,
   TECHS,
+  applyTechUnlock,
   buildSpec,
+  buildingUnlocked,
   furnaceUpgradeCost,
+  hasCombat,
+  isChargeBuilding,
+  recipeIdForOut,
+  recipeUnlocked,
+  techRequiresMet,
   towerLevel,
   towerUpgradeCost,
 } from './constants';
@@ -55,7 +63,7 @@ export function handleQueued(w: WorldState, queued: QueuedIntent[], ev: SimEvent
         handleBuild(w, intent.kind, intent.tier, intent.x, intent.z, ev);
         break;
       case 'research':
-        handleResearch(w, p, intent.tech);
+        handleResearch(w, p, intent.tech, ev);
         break;
       case 'setRecipe':
         setStationRecipe(w, intent.station, intent.res);
@@ -69,6 +77,9 @@ export function handleQueued(w: WorldState, queued: QueuedIntent[], ev: SimEvent
       case 'upgradeTower':
         handleUpgradeTower(w, intent.buildingId, ev);
         break;
+      case 'setDebug':
+        w.debug = !!intent.enabled;
+        break;
     }
   }
   queued.length = 0;
@@ -76,6 +87,8 @@ export function handleQueued(w: WorldState, queued: QueuedIntent[], ev: SimEvent
 
 function setStationRecipe(w: WorldState, station: StationType, res: ResourceId) {
   if (!STATION_RECIPES[station]?.some((r) => r.out === res)) return;
+  const rid = recipeIdForOut(res);
+  if (rid && !recipeUnlocked(w, rid)) return;
   const b = w.buildings.find((bb) => bb.type === station);
   if (!b) return;
   b.recipe = res;
@@ -88,10 +101,14 @@ function setStationRecipe(w: WorldState, station: StationType, res: ResourceId) 
 function cycleStationRecipe(w: WorldState, p: PlayerState, dir: number) {
   const ctx = stationAt(w, p);
   if (!ctx) return;
-  const list = STATION_RECIPES[ctx.station];
+  const list = STATION_RECIPES[ctx.station].filter((r) => {
+    const rid = recipeIdForOut(r.out);
+    return !rid || recipeUnlocked(w, rid);
+  });
+  if (!list.length) return;
   const at = list.findIndex((r) => r.out === ctx.recipe);
   const step = dir >= 0 ? 1 : -1;
-  const next = list[(at + step + list.length) % list.length];
+  const next = list[(Math.max(0, at) + step + list.length) % list.length];
   setStationRecipe(w, ctx.station, next.out);
 }
 
@@ -100,7 +117,7 @@ function handleUpgradeFurnace(w: WorldState, p: PlayerState, ev: SimEvent[]) {
   const furnace =
     ctx?.kind === 'furnace' ? w.buildings.find((b) => b.id === ctx.buildingId) : undefined;
   if (!furnace) return;
-  const cost = furnaceUpgradeCost(furnace.level);
+  const cost = furnaceUpgradeCost(furnace.level, furnace.type);
   if (!cost || !canAfford(w, cost)) return;
   pay(w, cost);
   furnace.level++;
@@ -158,14 +175,14 @@ function handleBeat(w: WorldState, p: PlayerState, ev: SimEvent[]) {
 
 function handleUpgradeTower(w: WorldState, buildingId: string, ev: SimEvent[]) {
   const b = w.buildings.find((bb) => bb.id === buildingId);
-  if (!b || (b.type !== 'towerArrow' && b.type !== 'towerBallista') || b.hp <= 0) return;
+  if (!b || !hasCombat(b.type) || b.hp <= 0) return;
   const cost = towerUpgradeCost(b.type, b.tier, b.level);
   if (!cost || !canAfford(w, cost)) return;
   const prev = towerLevel(b.type, b.tier, b.level);
   pay(w, cost);
   b.level++;
   const next = towerLevel(b.type, b.tier, b.level);
-  const gained = next.hpBonus - prev.hpBonus;
+  const gained = (next.hpBonus ?? 0) - (prev.hpBonus ?? 0);
   b.maxHp += gained;
   b.hp = Math.min(b.maxHp, b.hp + gained);
   ev.push({ type: 'upgraded', x: b.x, z: b.z, level: b.level });
@@ -181,10 +198,12 @@ function handleBuild(
 ) {
   const spec = buildSpec(kind, tier);
   if (!spec) return;
-  if (spec.needsTech && !w.techs[spec.needsTech].unlocked) return;
+  if (!w.debug && !buildingUnlocked(w, kind)) return;
   if (!canPlace(w, x, z, spec.footprint, kind)) return;
-  if (!canAfford(w, spec.cost)) return;
-  pay(w, spec.cost);
+  if (!w.debug) {
+    if (!canAfford(w, spec.cost)) return;
+    pay(w, spec.cost);
+  }
   w.buildings.push({
     id: `b${w.nextId++}`,
     type: kind,
@@ -192,7 +211,7 @@ function handleBuild(
     z,
     hp: spec.hp,
     maxHp: spec.hp,
-    tier: kind === 'blastFurnace' ? null : tier,
+    tier: isChargeBuilding(kind) ? null : tier,
     cd: 0,
     ammo: 0,
     smeltT: 0,
@@ -205,11 +224,27 @@ function handleBuild(
   ev.push({ type: 'built', x, z });
 }
 
-function handleResearch(w: WorldState, _p: PlayerState, tech: TechId) {
-  if (w.research || w.techs[tech].unlocked) return;
-  const def = TECHS[tech];
-  if (!canAfford(w, def.cost)) return;
-  pay(w, def.cost);
-  w.research = tech;
-  w.techs[tech].progress = 0;
+function handleResearch(w: WorldState, _p: PlayerState, tech: TechId, ev: SimEvent[]) {
+  if (w.techs[tech].unlocked) return;
+  if (!w.debug) {
+    if (w.research) return;
+    if (!techRequiresMet(w, tech)) return;
+    const def = TECHS[tech];
+    const cost = def.cost as Cost;
+    if (!canAfford(w, cost)) return;
+    pay(w, cost);
+    w.research = tech;
+    w.techs[tech].progress = 0;
+    return;
+  }
+  // Debug: unlock immediately, free, no prereqs, cancel any in-flight research.
+  if (w.research) {
+    w.techs[w.research].progress = 0;
+    w.research = null;
+  }
+  const t = w.techs[tech];
+  t.progress = 1;
+  t.unlocked = true;
+  applyTechUnlock(w, tech);
+  ev.push({ type: 'research', tech });
 }

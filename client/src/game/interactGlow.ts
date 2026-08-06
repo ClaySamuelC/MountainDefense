@@ -3,6 +3,7 @@ import {
   CARRY_CAP,
   cartCap,
   getContext,
+  hasCombat,
   type WorkContext,
   type WorldState,
 } from '@shared';
@@ -127,9 +128,7 @@ export function updateGuideHints(ctx: InteractGlowCtx, w: WorldState) {
   const wantCart = (ctx.introCart || packFull) && !!cart;
   const wantBuild = ctx.firstNightGuide;
   const wantGates = ctx.firstNightGuide;
-  const firstTower = w.buildings.find(
-    (b) => (b.type === 'towerArrow' || b.type === 'towerBallista') && b.hp > 0,
-  );
+  const firstTower = w.buildings.find((b) => hasCombat(b.type) && b.hp > 0);
 
   const prev = store.get().guide;
   if (prev.build !== wantBuild || prev.cart !== wantCart) {

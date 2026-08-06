@@ -4,7 +4,7 @@ import { store } from './ui/store';
 import { Game } from './game/Game';
 import { LocalTransport } from './net/local';
 import { hostGame, joinGame, type P2PTransport } from './net/p2p';
-import { clearSave, hasSave, loadSave } from './net/save';
+import { clearSave, consumeStaleSaveNotice, hasSave, loadSave, peekSave } from './net/save';
 import type { Transport } from './net/transport';
 import './styles.css';
 
@@ -122,5 +122,10 @@ const callbacks: AppCallbacks = {
   },
   onLeave: () => leaveGame(),
 };
+
+// Discard incompatible saves before the menu reads them, then surface a notice.
+peekSave();
+const stale = consumeStaleSaveNotice();
+if (stale) store.set({ connectError: stale });
 
 createRoot(document.getElementById('ui-root')!).render(<App cb={callbacks} />);

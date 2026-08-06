@@ -1,15 +1,25 @@
 /* Headless simulation smoke test: npm run test:sim */
 import {
   addPlayer,
+  applyTechUnlock,
+  assertCatalogValid,
+  buildingUnlocked,
   canPlace,
+  cartCap,
   createWorld,
   furnaceLevel,
+  hasFlag,
   placeError,
+  recipeUnlocked,
+  sanitizeWorld,
+  stat,
   tickWorld,
   DT,
   FURNACE_CAP,
   FURNACE_FOOTPRINT,
+  GATE_HP,
   RAIL_LENGTH,
+  WALL_HP,
   railPosAt,
   type PlayerInput,
   type QueuedIntent,
@@ -23,6 +33,16 @@ function check(name: string, cond: boolean, detail = '') {
   else {
     failures++;
     console.error(`FAIL  ${name} ${detail}`);
+  }
+}
+
+console.log('--- Catalog validation');
+{
+  try {
+    assertCatalogValid();
+    check('catalog cross-refs valid', true);
+  } catch (e) {
+    check('catalog cross-refs valid', false, String(e));
   }
 }
 
@@ -478,7 +498,7 @@ console.log('--- Scenario P: blast furnace is built, charged by hand, then runs 
     // Walk away — it should keep burning without anyone attending it.
     p.x = 0;
     p.z = 0;
-    const lvl1 = furnaceLevel(1).time;
+    const lvl1 = furnaceLevel(1).time ?? 48;
     run(w, lvl1 * 1.2, { mx: 0, mz: 0, hold: false });
     check('steel poured unattended', w.stockpile.steelIngot >= 1, `steel=${w.stockpile.steelIngot}`);
     check(
@@ -495,7 +515,8 @@ console.log('--- Scenario P: blast furnace is built, charged by hand, then runs 
     w.stockpile.copperIngot = 20;
     run(w, 1, { mx: 0, mz: 0, hold: false }, [{ sid: 'p1', intent: { type: 'upgradeFurnace' } }]);
     check('furnace upgraded', furnace.level === 2, `level=${furnace.level}`);
-    check('upgrade is faster', furnaceLevel(2).time < lvl1, `${furnaceLevel(2).time}s vs ${lvl1}s`);
+    const lvl2 = furnaceLevel(2).time ?? 25;
+    check('upgrade is faster', lvl2 < lvl1, `${lvl2}s vs ${lvl1}s`);
   }
 }
 
@@ -548,11 +569,82 @@ console.log('--- Scenario U: research works without a tech hub; player spawns in
 {
   const w = createWorld();
   const p = addPlayer(w, 'p1', 'Tester');
-  check('no tech hub building', !w.buildings.some((b) => b.type === 'techhub'));
   check('player not on the forge', Math.hypot(p.x - 13, p.z - 8) > 2.5, `spawn=${p.x},${p.z}`);
   w.stockpile.ironIngot = 10;
   tickWorld(w, new Map(), [{ sid: 'p1', intent: { type: 'research', tech: 'sharpPick' } }]);
   check('research started from anywhere', w.research === 'sharpPick', `research=${w.research}`);
+}
+
+console.log('--- Scenario V: tech effect contract (stats, flags, unlocks, HP mods)');
+{
+  const w = createWorld();
+  addPlayer(w, 'p1', 'Tester');
+  check('smeltSteel gated before steel tech', !recipeUnlocked(w, 'smeltSteel'));
+  check('blast furnace locked before steel', !buildingUnlocked(w, 'blastFurnace'));
+  check('ballista locked before steel', !buildingUnlocked(w, 'towerBallista'));
+  check('base cart cap', cartCap(w) === 12, `cap=${cartCap(w)}`);
+  check('base forge speed', stat(w, 'forgeSpeed') === 1, `spd=${stat(w, 'forgeSpeed')}`);
+
+  w.techs.steel.unlocked = true;
+  check('smeltSteel unlocked with steel', recipeUnlocked(w, 'smeltSteel'));
+  check('blast furnace unlocked', buildingUnlocked(w, 'blastFurnace'));
+
+  w.techs.cartCapacity.unlocked = true;
+  check('deep hoppers raise cart cap', cartCap(w) === 26, `cap=${cartCap(w)}`);
+
+  w.techs.bellows.unlocked = true;
+  check('bellows raises forgeSpeed', Math.abs(stat(w, 'forgeSpeed') - 1.6) < 1e-9, `spd=${stat(w, 'forgeSpeed')}`);
+  check('bellows sets forgeSlowBurn', hasFlag(w, 'forgeSlowBurn'));
+
+  const wall = w.buildings.find((b) => b.type === 'wall')!;
+  const gate = w.buildings.find((b) => b.type === 'gate')!;
+  const wallHp0 = wall.maxHp;
+  const gateHp0 = gate.maxHp;
+  check('walls start at catalog HP', wallHp0 === WALL_HP && gateHp0 === GATE_HP);
+
+  // Apply one-shot unlock side effects the same way research completion does.
+  applyTechUnlock(w, 'reinforcedWalls');
+  w.techs.reinforcedWalls.unlocked = true;
+  check('reinforced walls bump fort HP', wall.maxHp === Math.round(wallHp0 * 1.6), `wall=${wall.maxHp}`);
+  check('reinforced gates bump fort HP', gate.maxHp === Math.round(gateHp0 * 1.6), `gate=${gate.maxHp}`);
+  check('repairs cost half', Math.abs(stat(w, 'repairCost') - 0.5) < 1e-9, `rc=${stat(w, 'repairCost')}`);
+}
+
+console.log('--- Scenario W: sanitize round-trip survives missing fields + ticks');
+{
+  const w = createWorld();
+  addPlayer(w, 'p1', 'Tester');
+  const tower = w.buildings.find((b) => b.type === 'keep')!;
+  // Simulate a stale blob: drop level/charges and invent a removed building type.
+  const raw = JSON.parse(JSON.stringify(w)) as WorldState;
+  for (const b of raw.buildings) {
+    delete (b as { level?: number }).level;
+    delete (b as { charges?: number }).charges;
+    delete (b as { buildProgress?: number }).buildProgress;
+  }
+  raw.buildings.push({
+    id: 'ghost',
+    type: 'techhub' as WorldState['buildings'][number]['type'],
+    x: 0,
+    z: 0,
+    hp: 10,
+    maxHp: 10,
+    tier: null,
+    cd: 0,
+    ammo: 0,
+    smeltT: 0,
+    smelting: null,
+    recipe: null,
+    charges: 0,
+    level: 1,
+    buildProgress: 0,
+  });
+  const clean = sanitizeWorld(raw);
+  check('sanitize defaults building level', clean.buildings.every((b) => b.level >= 1));
+  check('sanitize drops unknown building types', !clean.buildings.some((b) => (b.type as string) === 'techhub'));
+  check('keep survived sanitize', clean.buildings.some((b) => b.id === tower.id));
+  run(clean, 2, { mx: 0, mz: 0, hold: false });
+  check('sanitized world ticks cleanly', finite(clean) && noNegativeStock(clean));
 }
 
 if (failures > 0) {

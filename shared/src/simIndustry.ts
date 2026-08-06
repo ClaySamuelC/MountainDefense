@@ -15,8 +15,18 @@ import {
   SMELT_STONE_CHANCE,
   SMELT_TIME,
   TECHS,
+  TICK_RATE,
+  applyTechUnlock,
+  dockAutoUnloadRate,
   findRecipe,
   furnaceLevel,
+  getBuilding,
+  hasFlag,
+  isChargeBuilding,
+  recipeById,
+  recipeUnlocked,
+  stationRecipeId,
+  stat,
 } from './constants';
 import { RAIL_LENGTH, railGradeAt, railPosAt, railTangentAt } from './rail';
 import { cartDocked, hasInputs } from './context';
@@ -25,7 +35,7 @@ import { addRes, pay } from './sim-helpers';
 const IDLE: PlayerInput = { mx: 0, mz: 0, hold: false };
 
 export function tickCarts(w: WorldState, inputs: Map<string, PlayerInput>, ev?: SimEvent[]) {
-  const loco = w.techs.locomotive.unlocked;
+  const loco = hasFlag(w, 'locomotive');
   for (const c of w.carts) {
     let push = 0;
     const rider = c.riderId ? w.players.find((p) => p.id === c.riderId) : null;
@@ -88,10 +98,11 @@ export function tickCarts(w: WorldState, inputs: Map<string, PlayerInput>, ev?: 
       rider.heading = Math.atan2(tan.x, tan.z);
     }
 
-    // Locomotive dock auto-unload
+    // Locomotive dock auto-unload (rate from catalog logistics.autoUnloadRate)
     if (loco && !rider && cartDocked(c.s) && c.loadTotal > 0) {
       c.v = 0;
-      if (w.tick % 8 === 0) unloadOne(w, c); // ~2.5/s
+      const interval = Math.max(1, Math.round(TICK_RATE / dockAutoUnloadRate()));
+      if (w.tick % interval === 0) unloadOne(w, c);
     }
   }
 }
@@ -133,6 +144,8 @@ export function pumpForge(w: WorldState, out: ResourceId, rate: number, ev: SimE
   const forge = w.buildings.find((b) => b.type === 'forge');
   if (!forge || forge.hp <= 0) return false;
   const recipe = findRecipe('forge', out);
+  const rid = stationRecipeId('forge', out);
+  if (rid && !recipeUnlocked(w, rid)) return false;
   if (!hasInputs(w, recipe.inputs)) return false;
 
   if (forge.smelting !== recipe.out) {
@@ -140,8 +153,8 @@ export function pumpForge(w: WorldState, out: ResourceId, rate: number, ev: SimE
     forge.smeltT = 0;
   }
 
-  // One tend pulse advances roughly a third of an ingot.
-  forge.smeltT += rate * 0.34;
+  // One tend pulse advances roughly a third of an ingot; bellows boosts forgeSpeed.
+  forge.smeltT += rate * 0.34 * stat(w, 'forgeSpeed');
   if (forge.smeltT >= 1) completeSmelt(w, forge, ev);
   return true;
 }
@@ -152,38 +165,42 @@ export function tickForge(w: WorldState, ev: SimEvent[]) {
 
   // Players actively pumping (hold E) advance via the forge work context.
   // Bellows tech keeps a slow residual burn while someone is still nearby.
-  if (!w.techs.bellows.unlocked) return;
+  if (!hasFlag(w, 'forgeSlowBurn')) return;
   const nearby = w.players.some(
     (p) => !p.riding && Math.hypot(p.x - forge.x, p.z - forge.z) < REACH_FORGE,
   );
   if (!nearby) return;
-  forge.smeltT += (0.25 * DT) / SMELT_TIME;
+  forge.smeltT += ((0.25 * DT) / SMELT_TIME) * stat(w, 'forgeSpeed');
   if (forge.smeltT >= 1) completeSmelt(w, forge, ev);
 }
 
 /**
- * The blast furnace runs on its own: it burns the charges of iron and coal a
- * player shovelled in, one slow ingot at a time. Upgrading the draught is the
- * only way to make it quick.
+ * Charge-mode producers (blast furnace) burn shovelled charges unattended.
+ * Upgrading the draught is the only way to make them quick.
  */
 export function tickFurnaces(w: WorldState, ev: SimEvent[]) {
   for (const b of w.buildings) {
-    if (b.type !== 'blastFurnace' || b.hp <= 0) continue;
+    if (!isChargeBuilding(b.type) || b.hp <= 0) continue;
+    const ind = getBuilding(b.type)?.industry;
+    if (!ind) continue;
+    const recipeId = ind.defaultRecipe ?? ind.recipes[0];
+    if (!recipeId || !recipeUnlocked(w, recipeId)) continue;
+    const recipe = recipeById(recipeId as Parameters<typeof recipeById>[0]);
 
     if (b.smelting === null) {
       if (b.charges < 1) continue;
       b.charges--;
-      b.smelting = 'steelIngot';
+      b.smelting = recipe.out;
       b.smeltT = 0;
     }
 
-    const seconds = furnaceLevel(b.level).time;
+    const seconds = furnaceLevel(b.level, b.type).time ?? recipe.time ?? 48;
     b.smeltT += DT / seconds;
     if (b.smeltT >= 1) {
-      w.stockpile.steelIngot++;
+      w.stockpile[recipe.out]++;
       b.smelting = null;
       b.smeltT = 0;
-      ev.push({ type: 'smelted', x: b.x, z: b.z, res: 'steelIngot' });
+      ev.push({ type: 'smelted', x: b.x, z: b.z, res: recipe.out });
     }
   }
 }
@@ -192,20 +209,11 @@ export function tickResearch(w: WorldState, ev: SimEvent[]) {
   if (!w.research) return;
   const tech = w.research;
   const t = w.techs[tech];
-  t.progress += DT / TECHS[tech].time;
+  t.progress += w.debug ? 1 : DT / TECHS[tech].time;
   if (t.progress < 1) return;
   t.progress = 1;
   t.unlocked = true;
   w.research = null;
+  applyTechUnlock(w, tech);
   ev.push({ type: 'research', tech });
-
-  if (tech === 'reinforcedWalls') {
-    for (const b of w.buildings) {
-      if (b.type === 'wall' || b.type === 'gate') {
-        const bonus = Math.round(b.maxHp * 0.6);
-        b.maxHp += bonus;
-        b.hp = Math.min(b.maxHp, b.hp + bonus);
-      }
-    }
-  }
 }

@@ -7,3 +7,4 @@ export * from './sim';
 export * from './sim-helpers';
 export * from './context';
 export * from './place';
+export * from './sanitize';

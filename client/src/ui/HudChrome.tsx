@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import {
   RESOURCE_HINTS,
+  RESOURCE_IDS,
   RESOURCE_NAMES,
   RESOURCE_SHORT,
   RESOURCE_STAGE,
@@ -10,7 +11,8 @@ import {
 } from '@shared';
 import { ResIcon, RES_UI } from './icons';
 
-const HUD_RESOURCES: ResourceId[] = [
+/** Preferred HUD order; any new catalog resources append automatically. */
+const HUD_PREFERRED: ResourceId[] = [
   'stone',
   'coal',
   'ironOre',
@@ -20,6 +22,10 @@ const HUD_RESOURCES: ResourceId[] = [
   'ironIngot',
   'copperIngot',
   'steelIngot',
+];
+const HUD_RESOURCES: ResourceId[] = [
+  ...HUD_PREFERRED.filter((r) => RESOURCE_IDS.includes(r)),
+  ...RESOURCE_IDS.filter((r) => !HUD_PREFERRED.includes(r)),
 ];
 
 const everSeen = new Set<ResourceId>(['coal', 'ironOre', 'stone']);

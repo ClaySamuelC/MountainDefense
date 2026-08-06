@@ -192,6 +192,28 @@ function PauseMenu({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
         >
           {muted ? 'Unmute' : 'Mute'}
         </button>
+        <label className="sound-row debug-row">
+          <span>Debug mode</span>
+          <input
+            type="checkbox"
+            checked={!!ui.snap?.debug}
+            onChange={(e) => {
+              const on = e.target.checked;
+              sfx.ui();
+              store.transport()?.send({ type: 'setDebug', enabled: on });
+              try {
+                localStorage.setItem('md-debug', on ? '1' : '0');
+              } catch {
+                /* ignore */
+              }
+              store.toast(
+                on ? 'Debug on — build & research are free and instant' : 'Debug off',
+                on ? 'warn' : 'info',
+              );
+            }}
+          />
+          <em>{ui.snap?.debug ? 'On' : 'Off'}</em>
+        </label>
         <div className="pause-actions">
           <button
             className="btn primary"

@@ -23,6 +23,7 @@ Controls and the day/night loop are listed on the main menu and in pause.
 ## Workspace
 
 - `shared/` — simulation, terrain, rail, balance
+- `shared/src/catalog/` — content registries (resources, recipes, buildings, techs); see [catalog README](shared/src/catalog/README.md)
 - `client/` — Three.js renderer, React HUD, PeerJS co-op
 - `scripts/deploy.mjs` — GitHub Pages publish
 

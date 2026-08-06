@@ -8,7 +8,13 @@ import {
 import { ResIcon } from './icons';
 
 /** Render a cost bag (`crude` is shown as stone). */
-export function CostChips({ cost, w }: { cost: Cost; w?: WorldState }) {
+export function CostChips({
+  cost,
+  w,
+}: {
+  cost: Cost | Partial<Record<string, number>>;
+  w?: WorldState;
+}) {
   return (
     <span className="cost">
       {Object.entries(cost).map(([r, n]) => {
