@@ -10,8 +10,8 @@ export type ResourceId =
   | 'steelIngot';
 
 /**
- * Cost bag. The special 'crude' entry is payable with stone and, when ore
- * spending is enabled, raw ore (stone is consumed first).
+ * Cost bag. The special 'crude' entry is stone-only (legacy alias for tower /
+ * repair / gun costs that still use the crude helpers).
  */
 export type Cost = Partial<Record<ResourceId | 'crude', number>>;
 
@@ -171,8 +171,6 @@ export interface WorldState {
   nextId: number;
   gameOver: boolean;
   nightsSurvived: number;
-  /** When false, raw ore is reserved for refining: crude costs/ammo use stone only. */
-  spendOre: boolean;
 }
 
 export type SimEvent =
@@ -206,7 +204,6 @@ export type Intent =
   /** Stone gun. Optional targetId aims at a specific enemy in range. */
   | { type: 'shoot'; targetId?: string }
   | { type: 'beat' }
-  | { type: 'toggleOreSpend' }
   | { type: 'build'; kind: BuildableType; tier: Tier; x: number; z: number }
   | { type: 'research'; tech: TechId }
   | { type: 'setRecipe'; station: StationType; res: ResourceId }

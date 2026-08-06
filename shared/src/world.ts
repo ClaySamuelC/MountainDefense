@@ -117,19 +117,17 @@ export function createWorld(): WorldState {
     nextId: 1,
     gameOver: false,
     nightsSurvived: 0,
-    spendOre: true,
   };
 
-  // Starting supplies: enough for one crude tower and some repairs.
+  // Starting supplies: one crude tower (stone) plus ore to begin refining.
   w.stockpile.ironOre = 10;
   w.stockpile.coal = 8;
-  w.stockpile.stone = 4;
+  w.stockpile.stone = 18;
 
   building(w, 'keep', POS.keep.x, POS.keep.z, KEEP_HP);
   building(w, 'dock', POS.dock.x, POS.dock.z, 250);
   building(w, 'anvil', POS.anvil.x, POS.anvil.z, 150);
   building(w, 'forge', POS.forge.x, POS.forge.z, 200);
-  building(w, 'techhub', POS.techhub.x, POS.techhub.z, 250);
   for (const x of WALL_XS) building(w, 'wall', x, WALL_Z, WALL_HP);
   for (const x of GATE_XS) building(w, 'gate', x, WALL_Z, GATE_HP);
 
@@ -161,9 +159,10 @@ export function addPlayer(w: WorldState, id: string, name: string): PlayerState 
     id,
     name,
     color: w.players.length % PLAYER_COLORS,
-    x: 14 + w.players.length * 1.5,
-    z: 8,
-    heading: Math.PI,
+    // Open courtyard between the yard and the wall — not tucked behind the forge.
+    x: 5 + w.players.length * 1.6,
+    z: 12,
+    heading: 0,
     carry: {},
     carryTotal: 0,
     riding: null,

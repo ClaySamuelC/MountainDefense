@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   BEAT_EARLY_FORGIVE,
   BEAT_WINDOW,
+  CARRY_CAP,
   CART_SPACING,
   ENEMY_SPAWNS,
   FURNACE_CAP,
@@ -15,6 +16,7 @@ import {
   WALL_Z,
   buildSpec,
   canAfford,
+  cartCap,
   cartDocked,
   contextReady,
   findRecipe,
@@ -155,7 +157,14 @@ export class Game {
   private outlineTarget: THREE.Group | null = null;
   private yardRing: THREE.Mesh;
 
-  private camTarget = new THREE.Vector3(8, 0, 8);
+  /** Extra onboarding outlines (cart / gates / first tower). */
+  private guideOutlines = new Map<string, { outline: THREE.Group; target: THREE.Group }>();
+  private introCart = true;
+  private firstNightGuide = false;
+  private firstNightUntil = 0;
+  private readonly startedAt = performance.now();
+
+  private camTarget = new THREE.Vector3(5, 0, 12);
   private camDist = 52;
   private raf = 0;
   private lastFrame = performance.now();
@@ -328,10 +337,16 @@ export class Game {
       case 'nightStart':
         sfx.night();
         store.toast(`Night ${e.night} — they come for the gates`, 'warn');
+        if (e.night === 1) {
+          this.firstNightGuide = true;
+          this.firstNightUntil = performance.now() + 55_000;
+          store.toast('Build a tower — defend the glowing gates', 'warn');
+        }
         break;
       case 'dawn':
         sfx.dawn();
         store.toast(`Dawn breaks — Day ${e.day}`, 'good');
+        this.firstNightGuide = false;
         break;
       case 'hit':
         sfx.hit();
@@ -490,7 +505,6 @@ export class Game {
     if (!w) return;
     const me = w.players.find((p) => p.id === this.transport.myId);
     let prompt = '';
-    let nearHub = false;
     let station: 'anvil' | 'forge' | null = null;
     let furnaceId: string | null = null;
     let towerId: string | null = null;
@@ -521,10 +535,12 @@ export class Game {
             }
           }
         }
-        const hub = w.buildings.find((b) => b.type === 'techhub');
-        if (hub && Math.hypot(me.x - hub.x, me.z - hub.z) < 6) {
-          nearHub = true;
-          if (!prompt) prompt = 'T — research technology';
+        if (!prompt && me.carryTotal >= CARRY_CAP) {
+          prompt = 'Pack full — walk over the cart to unload';
+        } else if (!prompt && this.introCart) {
+          prompt = 'The cart is ready — F to ride up the mountain';
+        } else if (!prompt && this.firstNightGuide) {
+          prompt = 'Night falls — Build a tower, hold the gates';
         }
       }
     }
@@ -533,7 +549,7 @@ export class Game {
     towerId = inspect.towerId;
     if (inspect.furnaceId) furnaceId = inspect.furnaceId;
     (window as any).__mdPaused = !!store.get().paused;
-    store.set({ snap: w, prompt, nearTechHub: nearHub, station, furnaceId, towerId });
+    store.set({ snap: w, prompt, station, furnaceId, towerId });
   }
 
   /**
@@ -617,6 +633,7 @@ export class Game {
       this.syncCarts(v.w, v.prev, v.alpha);
       this.syncPiles(v.w);
       this.updateInteractGlow(v.w);
+      this.updateGuideHints(v.w);
       this.updateLighting(v.w, dt);
       this.updateCamera(v.w, dt);
     }
@@ -749,6 +766,11 @@ export class Game {
     this.yardRing.visible = false;
   }
 
+  private clearGuideOutlines() {
+    for (const h of this.guideOutlines.values()) this.scene.remove(h.outline);
+    this.guideOutlines.clear();
+  }
+
   private updateInteractGlow(w: WorldState) {
     const me = w.players.find((p) => p.id === this.transport.myId);
     const ctx = me ? getContext(w, me) : null;
@@ -783,6 +805,80 @@ export class Game {
     if (this.yardRing.visible) {
       (this.yardRing.material as THREE.MeshBasicMaterial).opacity = pulse * 0.8;
       this.yardRing.rotation.z = performance.now() / 3000;
+    }
+  }
+
+  /**
+   * Soft onboarding: cart at start / when the pack is full; on the first night,
+   * pulse Build plus the gates and the first tower so the defense loop is obvious.
+   */
+  private updateGuideHints(w: WorldState) {
+    const me = w.players.find((p) => p.id === this.transport.myId);
+    const cart = w.carts[0];
+    if (me?.riding || (cart && cart.loadTotal > 0)) this.introCart = false;
+    if (performance.now() - this.startedAt > 50_000) this.introCart = false;
+    if (this.firstNightGuide && performance.now() > this.firstNightUntil) this.firstNightGuide = false;
+
+    const packFull =
+      !!me && me.carryTotal >= CARRY_CAP && !!cart && cart.loadTotal < cartCap(w);
+    const wantCart = (this.introCart || packFull) && !!cart;
+    const wantBuild = this.firstNightGuide;
+    const wantGates = this.firstNightGuide;
+    const firstTower = w.buildings.find(
+      (b) => (b.type === 'towerArrow' || b.type === 'towerBallista') && b.hp > 0,
+    );
+
+    const prev = store.get().guide;
+    if (prev.build !== wantBuild || prev.cart !== wantCart) {
+      store.set({ guide: { build: wantBuild, cart: wantCart } });
+    }
+
+    const desired = new Map<string, { group: THREE.Group; color: string }>();
+    // Skip the cart guide when the interact outline already owns it.
+    if (wantCart && !this.outlineKey.startsWith('c:')) {
+      const train = this.carts.get(cart!.id);
+      if (train) desired.set('guide:cart', { group: train.back, color: '#ffd76a' });
+    }
+    if (wantGates) {
+      for (const b of w.buildings) {
+        if (b.type !== 'gate' || b.hp <= 0) continue;
+        const g = this.buildings.get(b.id)?.group;
+        if (g) desired.set(`guide:gate:${b.id}`, { group: g, color: '#ff7a5c' });
+      }
+    }
+    if (this.firstNightGuide && firstTower) {
+      const g = this.buildings.get(firstTower.id)?.group;
+      if (g && this.outlineKey !== `b:${firstTower.id}`) {
+        desired.set('guide:tower', { group: g, color: '#7ec8ff' });
+      }
+    }
+
+    for (const key of [...this.guideOutlines.keys()]) {
+      if (!desired.has(key)) {
+        this.scene.remove(this.guideOutlines.get(key)!.outline);
+        this.guideOutlines.delete(key);
+      }
+    }
+    for (const [key, spec] of desired) {
+      let ent = this.guideOutlines.get(key);
+      if (!ent || ent.target !== spec.group) {
+        if (ent) this.scene.remove(ent.outline);
+        const outline = makeOutline(spec.group, spec.color);
+        this.scene.add(outline);
+        ent = { outline, target: spec.group };
+        this.guideOutlines.set(key, ent);
+      }
+    }
+
+    const pulse = 0.5 + Math.sin(performance.now() / 220) * 0.35;
+    for (const h of this.guideOutlines.values()) {
+      h.outline.position.copy(h.target.position);
+      h.outline.rotation.copy(h.target.rotation);
+      h.outline.scale.copy(h.target.scale);
+      for (const child of h.outline.children) {
+        ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = pulse;
+        break;
+      }
     }
   }
 
@@ -1244,6 +1340,8 @@ export class Game {
     cancelAnimationFrame(this.raf);
     window.clearInterval(this.hudTimer);
     window.removeEventListener('resize', this.onResize);
+    this.clearOutline();
+    this.clearGuideOutlines();
     this.input.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

@@ -14,26 +14,14 @@ export function addRes(
   if (bag[res]! <= 1e-9) delete bag[res];
 }
 
-/** Order in which 'crude' costs are paid. Stone first, raw ore as fallback. */
-const CRUDE_ORDER: ResourceId[] = ['stone', 'ironOre', 'copperOre'];
-
-/** Units available for 'crude' costs (stone always, raw ore only if spendOre). */
+/** 'crude' costs are paid in stone only — raw ore is for refining. */
 export function crudeStock(w: WorldState): number {
-  if (w.spendOre) {
-    return w.stockpile.stone + w.stockpile.ironOre + w.stockpile.copperOre;
-  }
   return w.stockpile.stone;
 }
 
-/** Consume `amount` crude units, stone first. Caller must check crudeStock. */
+/** Consume `amount` stone. Caller must check crudeStock. */
 export function payCrude(w: WorldState, amount: number): void {
-  for (const res of CRUDE_ORDER) {
-    if (amount <= 0) break;
-    if (res !== 'stone' && !w.spendOre) continue;
-    const take = Math.min(w.stockpile[res], amount);
-    w.stockpile[res] -= take;
-    amount -= take;
-  }
+  w.stockpile.stone = Math.max(0, w.stockpile.stone - amount);
 }
 
 export function canAfford(w: WorldState, cost: Cost): boolean {

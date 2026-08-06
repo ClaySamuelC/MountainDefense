@@ -92,9 +92,10 @@ console.log('--- Scenario B: mining fills the pack (mostly with the vein resourc
     stone += p.carry.stone ?? 0;
     other += (p.carry.coal ?? 0) + (p.carry.copperOre ?? 0);
   }
-  const mined = iron + stone + other;
+  const copper = other; // iron veins cross-yield copper only
+  const mined = iron + stone + copper;
   check('vein yields majority primary', iron / mined > 0.6, `iron=${iron}/${mined}`);
-  check('vein yields some byproduct', stone + other > 0, `stone=${stone} other=${other}`);
+  check('vein yields copper cross-product', copper / mined > 0.15 && copper / mined < 0.4, `copper=${copper}/${mined}`);
   check('vein yields not 100% primary', iron < mined, `iron=${iron}/${mined}`);
 }
 
@@ -192,7 +193,7 @@ console.log('--- Scenario G: monsters attack gates, never walls');
   check('a gate took damage', gates.some((b) => b.hp < b.maxHp), JSON.stringify(gates.map((b) => b.hp)));
 }
 
-console.log('--- Scenario H: stone gun consumes stone and kills; toggle reserves ore');
+console.log('--- Scenario H: stone gun consumes stone only');
 {
   const w = createWorld();
   const p = addPlayer(w, 'p1', 'Tester');
@@ -211,10 +212,9 @@ console.log('--- Scenario H: stone gun consumes stone and kills; toggle reserves
   check('gun killed the runner', w.enemies.length === 0);
   check('gun consumed stone', w.stockpile.stone === 0, `stone=${w.stockpile.stone}`);
 
-  // Toggle off: raw ore must not be spendable as ammo
+  // Raw ore is never ammo — only stone.
   w.stockpile.stone = 0;
   w.stockpile.ironOre = 5;
-  w.spendOre = false;
   w.enemies.push({
     id: `e${w.nextId++}`, kind: 'runner', x: p.x + 4, z: p.z, hp: 25, maxHp: 25,
     targetId: null, atkT: 0, speed: 0, dmg: 0, atkPeriod: 9,
@@ -223,39 +223,31 @@ console.log('--- Scenario H: stone gun consumes stone and kills; toggle reserves
   for (let i = 0; i < 60; i++) {
     tickWorld(w, inputs, [{ sid: 'p1', intent: { type: 'shoot' } }]);
   }
-  check('no shots without stone when ore is reserved', p.shots === shotsBefore, `shots=${p.shots}`);
-  check('ore untouched', w.stockpile.ironOre === 5, `ore=${w.stockpile.ironOre}`);
-
-  // Toggle back on: ore becomes valid ammo again
-  w.spendOre = true;
-  for (let i = 0; i < 60 && w.enemies.length > 0; i++) {
-    tickWorld(w, inputs, [{ sid: 'p1', intent: { type: 'shoot' } }]);
-  }
-  check('ore-fueled shots after toggle', p.shots > shotsBefore, `shots=${p.shots}`);
-  check('ore consumed as ammo', w.stockpile.ironOre < 5, `ore=${w.stockpile.ironOre}`);
+  check('no shots without stone', p.shots === shotsBefore, `shots=${p.shots}`);
+  check('ore untouched as ammo', w.stockpile.ironOre === 5, `ore=${w.stockpile.ironOre}`);
 }
 
-console.log('--- Scenario I: crude tower buildable with stone; blocked when ore reserved');
+console.log('--- Scenario I: crude tower costs stone, not raw ore');
 {
   const w = createWorld();
   addPlayer(w, 'p1', 'Tester');
   w.stockpile.stone = 0;
   w.stockpile.ironOre = 14;
   w.stockpile.copperOre = 0;
-  w.spendOre = false;
   const queue: QueuedIntent[] = [
     { sid: 'p1', intent: { type: 'build', kind: 'towerArrow', tier: 'crude', x: 6, z: 14 } },
   ];
   run(w, 1, { mx: 0, mz: 0, hold: false }, queue);
-  check('crude tower rejected when ore reserved', !w.buildings.some((b) => b.type === 'towerArrow'));
+  check('crude tower rejected without stone', !w.buildings.some((b) => b.type === 'towerArrow'));
 
-  w.spendOre = true;
+  w.stockpile.stone = 14;
   const queue2: QueuedIntent[] = [
     { sid: 'p1', intent: { type: 'build', kind: 'towerArrow', tier: 'crude', x: 6, z: 14 } },
   ];
   run(w, 1, { mx: 0, mz: 0, hold: false }, queue2);
-  check('crude tower built from raw ore when allowed', w.buildings.some((b) => b.type === 'towerArrow'));
-  check('ore paid', w.stockpile.ironOre === 0, `ore=${w.stockpile.ironOre}`);
+  check('crude tower built from stone', w.buildings.some((b) => b.type === 'towerArrow'));
+  check('stone paid', w.stockpile.stone === 0, `stone=${w.stockpile.stone}`);
+  check('ore unused for tower', w.stockpile.ironOre === 14, `ore=${w.stockpile.ironOre}`);
 }
 
 console.log('--- Scenario J: depleted vein respawns elsewhere');
@@ -550,6 +542,17 @@ console.log('--- Scenario T: day-time gate repair is available');
   const before = gate.hp;
   run(w, 3, { mx: 0, mz: 0, hold: true });
   check('gate repaired during day', gate.hp > before, `hp ${before} → ${gate.hp}`);
+}
+
+console.log('--- Scenario U: research works without a tech hub; player spawns in the open');
+{
+  const w = createWorld();
+  const p = addPlayer(w, 'p1', 'Tester');
+  check('no tech hub building', !w.buildings.some((b) => b.type === 'techhub'));
+  check('player not on the forge', Math.hypot(p.x - 13, p.z - 8) > 2.5, `spawn=${p.x},${p.z}`);
+  w.stockpile.ironIngot = 10;
+  tickWorld(w, new Map(), [{ sid: 'p1', intent: { type: 'research', tech: 'sharpPick' } }]);
+  check('research started from anywhere', w.research === 'sharpPick', `research=${w.research}`);
 }
 
 if (failures > 0) {

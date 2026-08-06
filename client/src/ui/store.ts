@@ -67,7 +67,6 @@ export interface UIState {
   buildSel: BuildSelection | null;
   buildOpen: boolean;
   techOpen: boolean;
-  nearTechHub: boolean;
   /** Refining station the local player is standing at, if any. */
   station: StationType | null;
   /** Blast furnace the local player is standing at, if any. */
@@ -76,6 +75,10 @@ export interface UIState {
   towerId: string | null;
   /** Solo pause overlay (also hosts the sound menu). */
   paused: boolean;
+  /** Pulsing HUD cues for onboarding (cart / first night). */
+  guide: { build: boolean; cart: boolean };
+  /** Full-width tip shown once at the start of a fresh solo run. */
+  introTip: string | null;
   toasts: Toast[];
   showHint: boolean;
 }
@@ -91,11 +94,12 @@ let state: UIState = {
   buildSel: null,
   buildOpen: false,
   techOpen: false,
-  nearTechHub: false,
   station: null,
   furnaceId: null,
   towerId: null,
   paused: false,
+  guide: { build: false, cart: false },
+  introTip: null,
   toasts: [],
   showHint: true,
 };
