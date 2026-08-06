@@ -62,7 +62,7 @@ try {
   await page.keyboard.press('Escape');
 
   // Ride toward the mine: teleport player to mountain to see mine area
-  await page.evaluate(() => window.__dbg?.teleport(-30, -28));
+  await page.evaluate(() => window.__dbg?.teleport(-48, -46));
   await sleep(1800);
   await page.screenshot({ path: 'shots/mine.png' });
 

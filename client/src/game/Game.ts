@@ -9,6 +9,7 @@ import {
   GATE_XS,
   GUN_RANGE,
   POS,
+  REACH_CART,
   REACH_MOUNT,
   RESOURCE_NAMES,
   TECHS,
@@ -88,26 +89,26 @@ const TMP_RIGHT = new THREE.Vector3();
 const TMP_UP = new THREE.Vector3();
 const TMP_CENTER = new THREE.Vector3();
 
-// Stockpile bins — spaced so each resource has a clear yard pad + marker
+// Stockpile bins — kept outside the cart's walk-over dump radius at the dock.
 const PILE_POS: Record<ResourceId, [number, number]> = {
-  coal: [0.5, 2.2],
-  stone: [-1.2, 4.0],
-  ironOre: [2.5, 1.8],
-  copperOre: [4.8, 2.8],
-  crushedIron: [1.0, 6.2],
-  crushedCopper: [3.5, 6.8],
-  ironIngot: [6.2, 5.5],
-  copperIngot: [7.5, 3.5],
-  steelIngot: [7.8, 7.0],
+  coal: [4.2, 6.8],
+  stone: [2.8, 8.2],
+  ironOre: [5.8, 5.4],
+  copperOre: [7.4, 6.6],
+  crushedIron: [4.0, 9.6],
+  crushedCopper: [6.2, 9.8],
+  ironIngot: [8.6, 8.0],
+  copperIngot: [9.4, 5.8],
+  steelIngot: [9.8, 9.2],
 };
 
-// Hand-placed mine dressing (lantern posts) on the plateau
+// Hand-placed mine dressing (lantern posts) on the stretched plateau
 const LANTERN_POS: [number, number][] = [
-  [-37.5, -30.5],
-  [-33, -34.5],
-  [-40, -35],
-  [-35, -39],
-  [-42.5, -31.5],
+  [-52, -44],
+  [-46, -48],
+  [-55, -50],
+  [-48, -55],
+  [-58, -46],
 ];
 
 // Torches flank each gate on the outside so the approach is lit at night.
@@ -251,8 +252,10 @@ export class Game {
 
     // Mine dressing: tunnel entrance, lantern posts, glowing crystal clusters
     const entrance = makeMineEntrance();
-    entrance.position.set(-44, terrainHeight(-44, -43), -43);
-    entrance.lookAt(POS.mine.x, terrainHeight(-44, -43), POS.mine.z);
+    const ex = POS.mine.x - 6;
+    const ez = POS.mine.z + 5;
+    entrance.position.set(ex, terrainHeight(ex, ez), ez);
+    entrance.lookAt(POS.mine.x, terrainHeight(ex, ez), POS.mine.z);
     this.scene.add(entrance);
     for (const [lx, lz] of LANTERN_POS) {
       const lantern = makeLanternPost();
@@ -1172,7 +1175,23 @@ export class Game {
       };
       place(train.front, s);
       // Ore cart always trails by CART_SPACING; sim keeps s >= CART_S_MIN so they never stack.
-      place(train.back, Math.max(0, s - CART_SPACING));
+      const backS = Math.max(0, s - CART_SPACING);
+      place(train.back, backS);
+
+      // Dump radius sits under the ore cart (walk-over load target).
+      const backPos = railPosAt(backS);
+      train.dumpRing.position.set(backPos.x, backPos.y + 0.06, backPos.z);
+      train.dumpRing.rotation.x = -Math.PI / 2;
+      train.dumpRing.rotation.z = performance.now() / 4000;
+      const me = w.players.find((p) => p.id === this.transport.myId);
+      const nearDump =
+        !!me &&
+        !me.riding &&
+        Math.hypot(me.x - backPos.x, me.z - backPos.z) < REACH_CART + 1.5;
+      const carrying = !!me && me.carryTotal > 0;
+      const mat = train.dumpRing.material as THREE.MeshBasicMaterial;
+      mat.opacity = carrying ? (nearDump ? 0.55 : 0.32) : 0.16;
+      mat.color.set(carrying && nearDump ? '#9fe9bd' : '#7ec8ff');
 
       train.load.visible = c.loadTotal > 0;
       const fill = Math.min(1, c.loadTotal / 12);

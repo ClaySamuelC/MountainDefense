@@ -9,8 +9,8 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-// Ramp centerline from the plateau edge down to the base yard (matches rail).
-const RAMP_A = { x: -28, z: -26 };
+// Ramp centerline from the plateau edge down to the base yard (matches stretched rail).
+const RAMP_A = { x: -38, z: -35 };
 const RAMP_B = { x: -4, z: 1 };
 const RAMP_LEN2 =
   (RAMP_B.x - RAMP_A.x) * (RAMP_B.x - RAMP_A.x) + (RAMP_B.z - RAMP_A.z) * (RAMP_B.z - RAMP_A.z);
@@ -41,14 +41,19 @@ function ridgeHeight(x: number, z: number): number {
   return Math.max(west, east);
 }
 
+/** True on the chokepoint flanks — players must not path around the wall here. */
+export function isRidgeBlocked(x: number, z: number): boolean {
+  return ridgeHeight(x, z) > 0.7;
+}
+
 export function terrainHeight(x: number, z: number): number {
-  // Mountain plateau (NW) — centred on the mine
-  const md = Math.hypot(x + 36, z + 36);
-  let h = PLATEAU_H * (1 - smoothstep(12, 28, md));
+  // Mountain plateau (NW) — centred on the stretched mine
+  const md = Math.hypot(x + 50, z + 50);
+  let h = PLATEAU_H * (1 - smoothstep(14, 32, md));
 
   // Decorative peak further NW (not gameplay-relevant)
-  const pd = Math.hypot(x + 52, z + 52);
-  h = Math.max(h, 13 * (1 - smoothstep(0, 18, pd)));
+  const pd = Math.hypot(x + 68, z + 68);
+  h = Math.max(h, 13 * (1 - smoothstep(0, 20, pd)));
 
   // Chokepoint ridges flanking the gate corridor
   h = Math.max(h, ridgeHeight(x, z));

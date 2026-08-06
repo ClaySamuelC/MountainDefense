@@ -77,11 +77,12 @@ export function spawnVein(w: WorldState, kind?: NodeKind): { x: number; z: numbe
   const k = kind ?? kinds[Math.floor(Math.random() * kinds.length)];
   for (let i = 0; i < 40; i++) {
     const a = Math.random() * Math.PI * 2;
-    const r = 5.5 + Math.random() * 12;
+    const r = 8 + Math.random() * 14;
     const x = POS.mine.x + Math.cos(a) * r;
     const z = POS.mine.z + Math.sin(a) * r;
     if (terrainHeight(x, z) < 6.5 || terrainSlope(x, z) > 0.35) continue;
-    if (distToRail(x, z) < 4.2) continue;
+    // Stay clear of the cart's walk-over dump radius while mining.
+    if (distToRail(x, z) < 7.5) continue;
     if (w.nodes.some((n) => n.amount > 0 && Math.hypot(n.x - x, n.z - z) < 4)) continue;
     const amount = 60 + Math.floor(Math.random() * 70);
     node(w, k, x, z, amount);
@@ -131,14 +132,13 @@ export function createWorld(): WorldState {
   for (const x of WALL_XS) building(w, 'wall', x, WALL_Z, WALL_HP);
   for (const x of GATE_XS) building(w, 'gate', x, WALL_Z, GATE_HP);
 
-  // A little farther from the rail spur than the old cluster, so the cart
-  // buffer doesn't sit on top of the first veins.
-  node(w, 'iron', -39, -30, 130);
-  node(w, 'iron', -43, -27, 110);
-  node(w, 'coal', -31, -29, 100);
-  node(w, 'coal', -34, -23, 80);
-  node(w, 'copper', -45, -33, 90);
-  node(w, 'copper', -32, -41, 90);
+  // Parked clear of the rail dump radius so mining never auto-loads the cart.
+  node(w, 'iron', -56, -42, 130);
+  node(w, 'iron', -60, -48, 110);
+  node(w, 'coal', -46, -54, 100);
+  node(w, 'coal', -52, -58, 80);
+  node(w, 'copper', -62, -44, 90);
+  node(w, 'copper', -48, -62, 90);
 
   w.carts.push({
     id: `c${w.nextId++}`,

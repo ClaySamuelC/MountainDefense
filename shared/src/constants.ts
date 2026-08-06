@@ -27,8 +27,9 @@ export const BEAT_EARLY_SETBACK = 0.12; // progress lost for hitting way too ear
 
 export const CART_CAP_BASE = 12;
 export const CART_CAP_UP = 26;
-export const CART_PUSH = 8.5;
-export const CART_LOCO_PUSH = 11;
+/** Push force — raised with the longer mine so the climb stays about as short. */
+export const CART_PUSH = 12;
+export const CART_LOCO_PUSH = 15.5;
 export const CART_SPACING = 2.7; // ore cart trails passenger cart
 /** Passenger cart never rolls past this — leaves room for the ore cart at the buffer. */
 export const CART_S_MIN = CART_SPACING;
@@ -420,7 +421,7 @@ export const POS = {
   anvil: { x: 8, z: 4.5 },
   forge: { x: 13, z: 8 },
   techhub: { x: 22, z: 10 },
-  mine: { x: -36, z: -36 },
+  mine: { x: -50, z: -50 },
 };
 
 // The wall spans the canyon chokepoint between the flanking ridges.

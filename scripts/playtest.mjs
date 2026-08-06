@@ -84,7 +84,7 @@ try {
   // Ride the cart: teleport near mine end, press F, push with W
   await page.evaluate(() => {
     const w = window.__dbg.world();
-    window.__dbg.teleport(-32.5, -27.5);
+    window.__dbg.teleport(-48, -46);
   });
   await sleep(300);
   await page.keyboard.press('KeyF');

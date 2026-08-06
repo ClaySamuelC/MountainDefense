@@ -80,6 +80,7 @@ import {
 import { addRes, canAfford, cartCap, crudeStock, pay, payCrude } from './sim-helpers';
 import { canPlace } from './place';
 import { spawnVein } from './world';
+import { isRidgeBlocked } from './terrain';
 import type { WorkContext } from './context';
 
 const IDLE: PlayerInput = { mx: 0, mz: 0, hold: false };
@@ -521,8 +522,17 @@ function tickPlayers(w: WorldState, inputs: Map<string, PlayerInput>, ev: SimEve
     }
     if (ml > 0.05) {
       const speed = PLAYER_SPEED * (1 - 0.25 * (p.carryTotal / CARRY_CAP));
-      p.x = Math.min(MAP_HALF - 2, Math.max(-MAP_HALF + 2, p.x + mx * speed * DT));
-      p.z = Math.min(MAP_HALF - 2, Math.max(-MAP_HALF + 2, p.z + mz * speed * DT));
+      const nx = Math.min(MAP_HALF - 2, Math.max(-MAP_HALF + 2, p.x + mx * speed * DT));
+      const nz = Math.min(MAP_HALF - 2, Math.max(-MAP_HALF + 2, p.z + mz * speed * DT));
+      // No climbing the gate flanks — the wall is the only way through.
+      if (!isRidgeBlocked(nx, nz)) {
+        p.x = nx;
+        p.z = nz;
+      } else if (!isRidgeBlocked(nx, p.z)) {
+        p.x = nx;
+      } else if (!isRidgeBlocked(p.x, nz)) {
+        p.z = nz;
+      }
       p.heading = Math.atan2(mx, mz);
     }
 
@@ -718,7 +728,7 @@ function tickCarts(w: WorldState, inputs: Map<string, PlayerInput>, ev?: SimEven
     } else if (push === 0 && Math.abs(gravityA) < 0.45) {
       c.v = 0;
     }
-    c.v = Math.min(13, Math.max(-13, c.v));
+    c.v = Math.min(16, Math.max(-16, c.v));
     c.s += c.v * DT;
 
     // Soft buffers: leave room for the trailing ore cart at the mine end,

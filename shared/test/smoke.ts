@@ -54,11 +54,11 @@ console.log('--- Scenario A: loaded cart rolls downhill to the dock');
   const w = createWorld();
   addPlayer(w, 'p1', 'Tester');
   const cart = w.carts[0];
-  cart.s = 16; // onto the downhill ramp; gravity should do the rest
-  cart.v = 1;
+  cart.s = RAIL_LENGTH * 0.35; // onto the downhill ramp; gravity should do the rest
+  cart.v = 2;
   cart.load = { ironOre: 8 };
   cart.loadTotal = 8;
-  run(w, 35, { mx: 0, mz: 0, hold: false });
+  run(w, 50, { mx: 0, mz: 0, hold: false });
   check('cart reached dock', cart.s > RAIL_LENGTH - 4, `s=${cart.s.toFixed(1)}/${RAIL_LENGTH.toFixed(1)}`);
 }
 
@@ -66,7 +66,7 @@ console.log('--- Scenario B: mining fills the pack (mostly with the vein resourc
 {
   const w = createWorld();
   const p = addPlayer(w, 'p1', 'Tester');
-  w.carts[0].s = 30; // park the cart away so the pack doesn't auto-dump into it
+  w.carts[0].s = RAIL_LENGTH * 0.5; // park the cart away so the pack doesn't auto-dump into it
   const node = w.nodes.find((n) => n.kind === 'iron')!;
   p.x = node.x + 1;
   p.z = node.z;
@@ -299,7 +299,7 @@ console.log('--- Scenario F: rail geometry sane');
   const end = railPosAt(RAIL_LENGTH);
   check('rail starts high (mine)', start.y > 6, `y=${start.y.toFixed(2)}`);
   check('rail ends low (dock)', end.y < 1.5, `y=${end.y.toFixed(2)}`);
-  check('rail length plausible', RAIL_LENGTH > 50 && RAIL_LENGTH < 130, `${RAIL_LENGTH.toFixed(1)}m`);
+  check('rail length plausible', RAIL_LENGTH > 70 && RAIL_LENGTH < 180, `${RAIL_LENGTH.toFixed(1)}m`);
 }
 
 console.log('--- Scenario K: carts leave room for the ore cart at the mine buffer');

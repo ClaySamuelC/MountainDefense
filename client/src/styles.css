@@ -133,7 +133,7 @@ body {
 .intro-tip {
   position: fixed;
   left: 50%;
-  bottom: 118px;
+  bottom: 210px;
   transform: translateX(-50%);
   width: min(520px, calc(100vw - 32px));
   padding: 14px 18px 12px;
