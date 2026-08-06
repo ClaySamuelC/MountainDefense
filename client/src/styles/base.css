@@ -1,0 +1,178 @@
+:root {
+  --panel: rgba(13, 17, 26, 0.86);
+  --panel-solid: #0e121c;
+  --stroke: rgba(255, 255, 255, 0.1);
+  --stroke-strong: rgba(255, 255, 255, 0.22);
+  --text: #e9edf6;
+  --dim: #9aa5bb;
+  --faint: #6f7a91;
+  --gold: #ffd085;
+  --amber: #e8a54b;
+  --green: #6fe08b;
+  --red: #ff8674;
+  --blue: #8fb6ff;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --radius: 14px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow: hidden;
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0b0e16;
+  user-select: none;
+}
+
+#game-root canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+}
+
+#ui-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: var(--text);
+  font-size: 14px;
+}
+
+#ui-root button,
+#ui-root input,
+.panel,
+.hud-clickable {
+  pointer-events: auto;
+}
+
+/* Numbers that change every frame must not reflow their neighbours */
+.res-num,
+.keep-num,
+.carry-count,
+.charge-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------ shared */
+
+.panel {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow);
+}
+
+/* Hairline highlight along the top edge — reads as glass, not flat fill */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  pointer-events: none;
+}
+
+.btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  border-radius: 11px;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s var(--ease), transform 0.1s var(--ease), border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--stroke-strong);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.menu.panel > .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #eeae56, #c97a2e);
+  border-color: #ffd28c;
+  color: #1d1608;
+  font-weight: 650;
+  width: 100%;
+  padding: 13px;
+  justify-content: center;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(180deg, #f7bb66, #d5842f);
+}
+
+.btn.hint-pulse {
+  animation: hint-pulse 1.1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 215, 106, 0.85), 0 0 18px rgba(255, 200, 80, 0.35);
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 2px rgba(255, 215, 106, 0.7), 0 0 12px rgba(255, 200, 80, 0.25);
+  }
+  50% {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 3px rgba(255, 230, 140, 0.95), 0 0 22px rgba(255, 210, 100, 0.55);
+  }
+}
+
+.btn.small {
+  padding: 7px 13px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+
+.btn.active {
+  background: rgba(232, 165, 75, 0.26);
+  border-color: var(--amber);
+  color: var(--gold);
+}
+
+kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 11px;
+  color: #dfe5f0;
+}
+
+.btn kbd {
+  margin-left: 2px;
+}
+

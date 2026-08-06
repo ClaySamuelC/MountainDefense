@@ -556,7 +556,6 @@ console.log('--- Scenario U: research works without a tech hub; player spawns in
 }
 
 if (failures > 0) {
-  console.error(`\n${failures} failure(s)`);
-  process.exit(1);
+  throw new Error(`${failures} failure(s)`);
 }
 console.log('\nAll sim smoke tests passed.');

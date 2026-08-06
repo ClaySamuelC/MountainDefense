@@ -1,0 +1,14 @@
+﻿# Local capture dumps (large binaries)
+shots/
+scratch-shots/
+
+# Build output
+dist/
+client/dist/
+
+# Lockfile noise — use package.json for deps
+package-lock.json
+
+# HUD chrome rarely needed for gameplay / sim work
+client/src/styles.css
+client/src/styles/

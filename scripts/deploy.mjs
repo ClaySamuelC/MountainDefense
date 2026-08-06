@@ -4,8 +4,8 @@
  * Usage:  npm run deploy
  *
  * Expects the GitHub remote to already exist (origin). First-time setup creates the
- * Pages site at https://<user>.github.io/<repo>/ — Solo mode works there fully;
- * Host/Join still needs a Colyseus server elsewhere.
+ * Pages site at https://<user>.github.io/<repo>/ — Solo and PeerJS co-op both work
+ * from the static client (no dedicated game server).
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';

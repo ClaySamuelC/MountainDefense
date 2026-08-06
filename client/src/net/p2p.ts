@@ -3,15 +3,13 @@ import {
   addPlayer,
   createWorld,
   removePlayer,
-  tickWorld,
   DT,
   type Intent,
-  type PlayerInput,
-  type QueuedIntent,
   type SimEvent,
   type WorldState,
 } from '@shared';
 import type { SnapshotHandler, Transport } from './transport';
+import { HostSim } from './hostSim';
 
 /** PeerJS peer id for a 4-digit room — keeps codes short while staying unique on the broker. */
 const peerIdFor = (code: string) => `md-${code}`;
@@ -104,10 +102,7 @@ class HostTransport implements P2PTransport {
   readonly myId = 'p1';
   readonly roomCode: string;
   private peer: Peer;
-  private world: WorldState;
-  private inputs = new Map<string, PlayerInput>();
-  private queue: QueuedIntent[] = [];
-  private handlers: SnapshotHandler[] = [];
+  private sim: HostSim;
   private clients = new Map<DataConnection, string>(); // conn -> player id
   private timer: number;
   private sendCounter = 0;
@@ -118,8 +113,9 @@ class HostTransport implements P2PTransport {
   constructor(peer: Peer, code: string, hostName: string) {
     this.peer = peer;
     this.roomCode = code;
-    this.world = createWorld();
-    addPlayer(this.world, this.myId, hostName);
+    const world = createWorld();
+    addPlayer(world, this.myId, hostName);
+    this.sim = new HostSim(world);
 
     peer.on('connection', (conn) => this.accept(conn));
     peer.on('disconnected', () => {
@@ -132,6 +128,10 @@ class HostTransport implements P2PTransport {
     });
 
     this.timer = window.setInterval(() => this.step(), 1000 * DT);
+  }
+
+  private get world(): WorldState {
+    return this.sim.world;
   }
 
   private accept(conn: DataConnection) {
@@ -192,23 +192,14 @@ class HostTransport implements P2PTransport {
   private onClientData(sid: string, data: unknown) {
     const msg = data as WireMsg;
     if (!msg || msg.type !== 'intent' || !msg.intent || typeof msg.intent.type !== 'string') return;
-    const intent = msg.intent;
-    if (intent.type === 'input') {
-      this.inputs.set(sid, {
-        mx: clampAxis(intent.mx),
-        mz: clampAxis(intent.mz),
-        hold: !!intent.hold,
-      });
-    } else if (this.queue.length < 256) {
-      this.queue.push({ sid, intent });
-    }
+    this.sim.applyIntent(sid, msg.intent, { clamp: true });
   }
 
   private dropClient(conn: DataConnection) {
     const id = this.clients.get(conn);
     if (!id) return;
     this.clients.delete(conn);
-    this.inputs.delete(id);
+    this.sim.clearInput(id);
     removePlayer(this.world, id);
     try {
       conn.close();
@@ -221,14 +212,11 @@ class HostTransport implements P2PTransport {
     if (this.dead) return;
     if ((window as any).__mdPaused) return;
 
-    const ev = tickWorld(this.world, this.inputs, this.queue);
+    const { snap, ev } = this.sim.step();
     if (ev.length) this.pendingEvents.push(...ev);
     this.sendCounter++;
 
-    const snap = structuredClone(this.world);
     // Host paints every tick; guests get a 10 Hz snapshot with batched events.
-    for (const h of this.handlers) h(snap, ev);
-
     if (this.sendCounter % 2 === 0) {
       const outEv = this.pendingEvents;
       this.pendingEvents = [];
@@ -238,19 +226,11 @@ class HostTransport implements P2PTransport {
   }
 
   send(intent: Intent): void {
-    if (intent.type === 'input') {
-      this.inputs.set(this.myId, {
-        mx: clampAxis(intent.mx),
-        mz: clampAxis(intent.mz),
-        hold: !!intent.hold,
-      });
-    } else if (this.queue.length < 256) {
-      this.queue.push({ sid: this.myId, intent });
-    }
+    this.sim.applyIntent(this.myId, intent, { clamp: true });
   }
 
   onSnapshot(cb: SnapshotHandler): void {
-    this.handlers.push(cb);
+    this.sim.onSnapshot(cb);
   }
 
   whenDisconnected(cb: DisconnectHandler): void {
@@ -266,7 +246,7 @@ class HostTransport implements P2PTransport {
   dispose(): void {
     this.dead = true;
     window.clearInterval(this.timer);
-    this.handlers = [];
+    this.sim.clearHandlers();
     this.discHandlers = [];
     for (const conn of [...this.clients.keys()]) {
       try {
@@ -421,11 +401,6 @@ function safeSend(conn: DataConnection, msg: WireMsg) {
   } catch (err) {
     console.warn('[p2p send]', err);
   }
-}
-
-function clampAxis(n: unknown): number {
-  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
-  return Math.min(1, Math.max(-1, v));
 }
 
 /** Host a co-op session. Returns once the 4-digit room code is claimed on PeerJS. */

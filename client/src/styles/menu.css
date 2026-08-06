@@ -1,0 +1,194 @@
+/* ------------------------------------------------ menu */
+
+.menu-bg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(1100px 500px at 25% 18%, rgba(127, 178, 87, 0.22), transparent 60%),
+    radial-gradient(900px 600px at 78% 82%, rgba(85, 100, 200, 0.26), transparent 60%),
+    linear-gradient(168deg, #1a2233 0%, #0b0e16 100%);
+}
+
+.menu {
+  text-align: center;
+  padding: 40px 52px 34px;
+  max-width: 520px;
+}
+
+.menu-crest {
+  font-size: 30px;
+  color: var(--gold);
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.menu h1 {
+  font-size: 36px;
+  letter-spacing: 7px;
+  background: linear-gradient(180deg, #ffe0a4, #d98a4a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 6px;
+}
+
+.tagline {
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+
+.menu-version {
+  margin: 0 0 22px;
+  color: var(--faint);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.btn .btn-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--dim);
+  box-shadow: none;
+}
+
+.btn.ghost:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.intro-tip {
+  position: fixed;
+  left: 50%;
+  bottom: 210px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  padding: 14px 18px 12px;
+  border: 1px solid rgba(255, 215, 106, 0.45);
+  border-radius: 14px;
+  background: rgba(12, 14, 20, 0.92);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 200, 100, 0.08);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  z-index: 30;
+  animation: intro-in 0.35s var(--ease);
+}
+
+.intro-tip strong {
+  display: block;
+  color: var(--gold);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.intro-tip p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: #efe8d8;
+}
+
+.intro-tip-dismiss {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+@keyframes intro-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.menu-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.join-row {
+  display: flex;
+  gap: 6px;
+}
+
+.join-row input {
+  width: 108px;
+  letter-spacing: 0.18em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.join-row input:focus {
+  border-color: var(--amber);
+}
+
+.menu-coop-note {
+  margin: 12px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.error {
+  margin-top: 14px;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.controls-hint {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--stroke);
+  display: flex;
+  gap: 8px 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  margin: 18px auto 0;
+  border: 2px solid var(--stroke);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

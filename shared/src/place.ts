@@ -5,7 +5,7 @@ import { distToRail } from './rail';
 
 /**
  * Why a structure cannot be placed at (x, z), or null if it can.
- * Shared by server validation and the client ghost / feedback toasts.
+ * Used by the host sim and the client ghost / feedback toasts.
  */
 export function placeError(
   w: WorldState,

@@ -1,0 +1,207 @@
+/* ------------------------------------------------ timing mini-game */
+
+.beat {
+  --flash: 0;
+  position: fixed;
+  bottom: 118px;
+  left: 50%;
+  width: 460px;
+  transform: translate(-50%, 8px);
+  padding: 9px 14px 8px;
+  background: rgba(9, 12, 19, 0.9);
+  border: 1px solid var(--stroke-strong);
+  border-radius: 13px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s var(--ease), transform 0.12s var(--ease);
+}
+
+.beat.on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.beat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.beat-label {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.3px;
+  color: var(--gold);
+}
+
+.beat-penalty-tag {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #ff9d86;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.beat.penalty .beat-penalty-tag {
+  opacity: 1;
+}
+
+.beat-track {
+  position: relative;
+  height: 26px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.beat.penalty .beat-track {
+  border-color: rgba(255, 120, 95, 0.45);
+}
+
+/* Progress trail behind the marker */
+.beat-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0.001);
+  will-change: transform;
+  background: linear-gradient(90deg, rgba(255, 175, 70, 0.18), rgba(255, 200, 100, 0.42));
+}
+
+/* Grace band: a hair early still banks, but it isn't the lit target */
+.beat-grace {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(74, 226, 144, 0), rgba(74, 226, 144, 0.16));
+}
+
+/* The window you are aiming for */
+.beat-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, rgba(74, 226, 144, 0.24), rgba(74, 226, 144, 0.5));
+  border-left: 2px solid #b6ffd4;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+
+.beat-zone span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  color: rgba(4, 26, 14, 0.72);
+}
+
+.beat.in-window .beat-zone {
+  background: linear-gradient(90deg, rgba(120, 255, 180, 0.5), rgba(150, 255, 200, 0.82));
+  box-shadow: inset 0 0 22px rgba(190, 255, 215, 0.6);
+}
+
+.beat.banked .beat-zone {
+  background: linear-gradient(90deg, rgba(255, 200, 100, 0.5), rgba(255, 220, 140, 0.85));
+  border-left-color: #ffe9b8;
+}
+
+.beat.banked .beat-zone span::after {
+  content: ' ✓';
+}
+
+.beat-needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Over the lit gold zone a white needle disappears, so darken it instead */
+.beat.banked .beat-needle {
+  background: #4a3208;
+  box-shadow: 0 0 0 1px rgba(255, 240, 200, 0.9);
+}
+
+.beat-tip {
+  margin-top: 5px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+/* One tip line at a time: waiting, in range, or already banked. Follows the
+   grace band, since a tap there banks just as well as one in the lit zone. */
+.beat-tip-now,
+.beat-tip-done,
+.beat.in-grace .beat-tip-wait,
+.beat.banked .beat-tip-wait {
+  display: none;
+}
+
+.beat.in-grace .beat-tip-now,
+.beat.banked .beat-tip-done {
+  display: inline;
+}
+
+.beat.in-grace .beat-tip {
+  color: #9fe9bd;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.beat.banked .beat-tip {
+  color: #e8c98a;
+}
+
+/* Hit and miss feedback, driven by the --flash ramp */
+.beat.flash-good {
+  border-color: rgba(255, 226, 150, calc(0.25 + var(--flash) * 0.75));
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 calc(var(--flash) * 26px) rgba(255, 214, 130, calc(var(--flash) * 0.7));
+}
+
+.beat.flash-miss {
+  border-color: rgba(255, 130, 100, calc(0.25 + var(--flash) * 0.75));
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 calc(var(--flash) * 18px) rgba(255, 110, 90, calc(var(--flash) * 0.45));
+}
+
+.hint {
+  position: fixed;
+  bottom: 196px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--dim);
+  font-size: 12.5px;
+  background: rgba(11, 14, 22, 0.62);
+  border-radius: 10px;
+  padding: 8px 18px;
+  white-space: nowrap;
+}
+
+.hint strong {
+  color: var(--gold);
+  font-weight: 600;
+}
+
