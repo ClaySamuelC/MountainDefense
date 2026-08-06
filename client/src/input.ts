@@ -101,14 +101,25 @@ export class InputManager {
 
     switch (e.code) {
       case 'KeyE':
-        // First press enters work mode; further presses also hit the beat.
+        // OS key-repeat must not re-fire — that was restarting the timing swing.
+        if (e.repeat) break;
+        if (ui.introTip) {
+          store.set({ introTip: null });
+          break;
+        }
+        // First press enters work mode; a later deliberate press hits the beat.
         if (this.working) this.transport.send({ type: 'beat' });
-        this.working = true;
+        else this.working = true;
         break;
       case 'KeyF':
         this.transport.send({ type: 'mount' });
         break;
       case 'Space':
+        if (e.repeat) {
+          e.preventDefault();
+          break;
+        }
+        if (ui.introTip) store.set({ introTip: null });
         // Timing beat while mining / anvil / forge (sim gates it when idle)
         this.transport.send({ type: 'beat' });
         e.preventDefault();

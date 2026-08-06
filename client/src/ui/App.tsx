@@ -316,7 +316,7 @@ function IntroTip({ text }: { text: string }) {
     >
       <strong>First day</strong>
       <p>{text}</p>
-      <span className="intro-tip-dismiss">Click to dismiss</span>
+      <span className="intro-tip-dismiss">Click or press E to dismiss</span>
     </button>
   );
 }

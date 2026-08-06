@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   BEAT_WINDOW,
+  REACH_CART,
   type BuildingType,
   type EnemyKind,
   type NodeKind,
@@ -600,7 +601,13 @@ function makePileMarker(res: ResourceId): THREE.Group {
   return g;
 }
 
-export function makeCartTrain(): { group: THREE.Group; front: THREE.Group; back: THREE.Group; load: THREE.Mesh } {
+export function makeCartTrain(): {
+  group: THREE.Group;
+  front: THREE.Group;
+  back: THREE.Group;
+  load: THREE.Mesh;
+  dumpRing: THREE.Mesh;
+} {
   const group = new THREE.Group();
   const wood = std('#7a5231');
   const woodDark = std('#5f3f24');
@@ -638,8 +645,22 @@ export function makeCartTrain(): { group: THREE.Group; front: THREE.Group; back:
   load.visible = false;
   back.add(load);
 
-  group.add(front, back);
-  return { group, front, back, load };
+  // Walk-over dump radius — follows the ore cart in syncCarts.
+  const dumpRing = new THREE.Mesh(
+    new THREE.RingGeometry(REACH_CART - 0.3, REACH_CART, 48),
+    new THREE.MeshBasicMaterial({
+      color: '#7ec8ff',
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  dumpRing.rotation.x = -Math.PI / 2;
+  dumpRing.name = 'dumpRing';
+
+  group.add(front, back, dumpRing);
+  return { group, front, back, load, dumpRing };
 }
 
 // ------------------------------------------------------------ buildings
@@ -683,14 +704,25 @@ export function makeBuilding(type: BuildingType, tier: Tier | null): THREE.Group
       break;
     }
     case 'wall': {
-      intact.add(box(4.0, 2.4, 1.2, stone, 0, 1.2, 0));
-      for (let i = -1; i <= 1; i++) intact.add(box(0.8, 0.5, 1.2, stoneDark, i * 1.4, 2.65, 0));
+      // Slightly short of a full 4m bay so wall ends don't z-fight gate towers.
+      intact.add(box(3.2, 2.4, 1.15, stone, 0, 1.2, 0));
+      for (let i = -1; i <= 1; i++) intact.add(box(0.7, 0.5, 1.15, stoneDark, i * 1.1, 2.65, 0));
       break;
     }
     case 'gate': {
-      intact.add(box(1.2, 3.4, 1.4, stoneDark, -1.7, 1.7, 0));
-      intact.add(box(1.2, 3.4, 1.4, stoneDark, 1.7, 1.7, 0));
-      intact.add(box(4.6, 1.0, 1.4, stone, 0, 3.7, 0));
+      // Towers sit clear of neighboring wall segments; lintel slightly proud in Z
+      // so it never shares a face with the wall tops.
+      const gateStone = stone.clone();
+      gateStone.polygonOffset = true;
+      gateStone.polygonOffsetFactor = -1;
+      gateStone.polygonOffsetUnits = -1;
+      const gateDark = stoneDark.clone();
+      gateDark.polygonOffset = true;
+      gateDark.polygonOffsetFactor = -1;
+      gateDark.polygonOffsetUnits = -1;
+      intact.add(box(1.15, 3.4, 1.35, gateDark, -1.85, 1.7, 0));
+      intact.add(box(1.15, 3.4, 1.35, gateDark, 1.85, 1.7, 0));
+      intact.add(box(4.4, 0.95, 1.5, gateStone, 0, 3.75, 0.05));
       intact.add(box(2.4, 2.6, 0.25, wood, 0, 1.3, 0));
       // Watch braziers on the gate towers — lit at dusk with the wall torches
       const braMat = new THREE.MeshStandardMaterial({
@@ -698,7 +730,7 @@ export function makeBuilding(type: BuildingType, tier: Tier | null): THREE.Group
         emissive: '#ff8a2b',
         emissiveIntensity: 0,
       });
-      for (const sx of [-1.7, 1.7]) {
+      for (const sx of [-1.85, 1.85]) {
         intact.add(cyl(0.34, 0.2, 0.32, std('#4a423a', { metalness: 0.45 }), sx, 3.56, 0, 8));
         const bra = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), braMat);
         bra.position.set(sx, 3.95, 0);

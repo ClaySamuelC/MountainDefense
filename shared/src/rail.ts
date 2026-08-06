@@ -6,8 +6,11 @@ export interface Vec3 {
   z: number;
 }
 
-// Track control points: deeper into the mine plateau, longer winding ramp to dock.
-const CONTROL_XZ: [number, number][] = [
+/** Dock end stays put; everything else stretches 40% farther into the mountain. */
+const DOCK_XZ: [number, number] = [-2, 2];
+const MINE_STRETCH = 1.4;
+
+const CONTROL_XZ_BASE: [number, number][] = [
   [-40, -36],
   [-37, -33],
   [-34, -30],
@@ -21,6 +24,14 @@ const CONTROL_XZ: [number, number][] = [
   [-4, 1],
   [-2, 2],
 ];
+
+const CONTROL_XZ: [number, number][] = CONTROL_XZ_BASE.map(([x, z], i) => {
+  if (i === CONTROL_XZ_BASE.length - 1) return [x, z];
+  return [
+    DOCK_XZ[0] + (x - DOCK_XZ[0]) * MINE_STRETCH,
+    DOCK_XZ[1] + (z - DOCK_XZ[1]) * MINE_STRETCH,
+  ];
+});
 
 const SAMPLES = 900;
 
@@ -74,7 +85,6 @@ export const RAIL_LENGTH = cumLen[cumLen.length - 1];
 
 export function railPosAt(s: number): Vec3 {
   const target = Math.min(RAIL_LENGTH, Math.max(0, s));
-  // binary search cumLen
   let lo = 0;
   let hi = cumLen.length - 1;
   while (lo < hi) {
