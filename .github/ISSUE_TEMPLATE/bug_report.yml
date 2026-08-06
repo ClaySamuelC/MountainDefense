@@ -1,0 +1,87 @@
+name: Bug report
+description: Something is wrong but the game didn't crash (wrong behavior, balance, UI, audio, etc.).
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for broken or unexpected behavior. For hard crashes, pick **Crash report** instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the bug.
+      placeholder: Towers stop firing after researching the second tech.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Towers keep firing at enemies in range.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: After unlocking Steel, crude towers never shoot again until reload.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start Solo Expedition
+        2. Research …
+        3. …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Play mode
+      options:
+        - Solo
+        - Host co-op
+        - Join co-op
+        - Unsure / other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Safari
+        - Other
+    validations:
+      required: false
+
+  - type: input
+    id: build
+    attributes:
+      label: Build / URL
+      description: GitHub Pages URL or local dev.
+      placeholder: https://claysamuelc.github.io/MountainDefense/
+    validations:
+      required: false
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Extra context
+      description: Screenshots, console logs, save notes, how often it happens.
+    validations:
+      required: false

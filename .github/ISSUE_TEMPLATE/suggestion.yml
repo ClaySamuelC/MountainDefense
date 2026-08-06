@@ -1,0 +1,50 @@
+name: Suggestion
+description: Ideas, QoL requests, balance thoughts, or new features.
+title: "suggestion: "
+labels: ["suggestion", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share an idea for Mountain Defense. Be concrete about the problem it solves if you can.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of suggestion
+      options:
+        - New feature
+        - Quality of life
+        - Balance / difficulty
+        - Controls / UX
+        - Visuals / audio
+        - Co-op
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should change or be added?
+      placeholder: Let players rename the minecart, or show a small ore-type icon on veins from farther away.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it helps
+      description: What friction, confusion, or fun gap this addresses.
+      placeholder: It's hard to tell vein types until you're on top of them at night.
+    validations:
+      required: false
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Extra detail
+      description: Rough design notes, alternatives you considered, mockups, related issues.
+    validations:
+      required: false

@@ -1,0 +1,87 @@
+name: Crash report
+description: The game crashed, froze, or failed hard (white screen, uncaught error, disconnect loop).
+title: "crash: "
+labels: ["crash", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a crash. Include whatever you can reproduce — console errors and steps help a lot.
+
+  - type: input
+    id: where
+    attributes:
+      label: Where it happened
+      description: Solo, Host co-op, Join co-op, or menu?
+      placeholder: Solo Expedition
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw (freeze, blank screen, reload, error toast, etc.).
+      placeholder: Game went white and stopped responding after night started.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps if you can reproduce it. If it was one-off, say so.
+      placeholder: |
+        1. Start Solo Expedition
+        2. Ride cart to a vein
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console / error text
+      description: From the browser console (F12 → Console), or any on-screen error. Paste raw text if you have it.
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Safari
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device / OS
+      description: e.g. Windows 11 desktop, MacBook, iPhone Safari
+      placeholder: Windows 11
+    validations:
+      required: false
+
+  - type: input
+    id: build
+    attributes:
+      label: Build / URL
+      description: GitHub Pages URL, local `npm run dev:client`, or commit hash if you know it.
+      placeholder: https://claysamuelc.github.io/MountainDefense/
+    validations:
+      required: false
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Anything else
+      description: Save state notes, mods, co-op room size, screenshot links, etc.
+    validations:
+      required: false

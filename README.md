@@ -85,6 +85,16 @@ One friend clicks **Host Co-op**, reads the 4-digit room code in the HUD, and
 keeps that tab open. Everyone else **Join**s with that code. The host's browser
 runs the sim — if they leave, the session ends.
 
+## Report a problem or idea
+
+Open an issue with one of the forms:
+
+- [Crash report](https://github.com/ClaySamuelC/MountainDefense/issues/new?template=crash_report.yml)
+- [Bug report](https://github.com/ClaySamuelC/MountainDefense/issues/new?template=bug_report.yml)
+- [Suggestion](https://github.com/ClaySamuelC/MountainDefense/issues/new?template=suggestion.yml)
+
+Or use the chooser: [New issue](https://github.com/ClaySamuelC/MountainDefense/issues/new/choose).
+
 ## Dev scripts
 
 - `npm run test:sim` - headless simulation smoke test
