@@ -27,14 +27,14 @@ export const BEAT_EARLY_SETBACK = 0.12; // progress lost for hitting way too ear
 
 export const CART_CAP_BASE = 12;
 export const CART_CAP_UP = 26;
-export const CART_PUSH = 7;
-export const CART_LOCO_PUSH = 9;
+export const CART_PUSH = 8.5;
+export const CART_LOCO_PUSH = 11;
 export const CART_SPACING = 2.7; // ore cart trails passenger cart
 /** Passenger cart never rolls past this — leaves room for the ore cart at the buffer. */
 export const CART_S_MIN = CART_SPACING;
 
 export const REPAIR_RATE = 45; // hp per second
-export const REPAIR_ORE_PER_HP = 1 / 35; // crude units (stone/raw ore) per hp
+export const REPAIR_ORE_PER_HP = 1 / 35; // stone per hp repaired
 
 export const MELEE_DMG = 7;
 export const MELEE_RANGE = 2.8;
@@ -73,7 +73,7 @@ export const TOWER_SPECS: Record<string, TowerSpec> = {
     rate: 0.8,
     range: 13,
     hp: 120,
-    cost: { crude: 14 },
+    cost: { stone: 14 },
   },
   'towerArrow:refined': {
     dmg: 9,
@@ -249,7 +249,7 @@ export interface BuildSpec {
 export const BUILD_SPECS: Record<string, BuildSpec> = {
   'towerArrow:crude': {
     name: 'Crude Tower',
-    blurb: 'Lashed logs and loose rock. Cheap to raise, soft in a fight.',
+    blurb: 'Lashed logs and loose rock. Costs stone. Soft in a fight.',
     cost: TOWER_SPECS['towerArrow:crude'].cost,
     hp: TOWER_SPECS['towerArrow:crude'].hp,
     footprint: 2.4,
@@ -348,10 +348,23 @@ export const RESOURCE_NAMES: Record<ResourceId, string> = {
   steelIngot: 'Steel Ingot',
 };
 
+/** Short HUD tags so chips stay readable at a glance. */
+export const RESOURCE_SHORT: Record<ResourceId, string> = {
+  coal: 'Coal',
+  stone: 'Stone',
+  ironOre: 'Iron',
+  copperOre: 'Copper',
+  crushedIron: 'Cr.Fe',
+  crushedCopper: 'Cr.Cu',
+  ironIngot: 'Fe bar',
+  copperIngot: 'Cu bar',
+  steelIngot: 'Steel',
+};
+
 /** One-line "what is this for" shown when hovering a resource in the HUD. */
 export const RESOURCE_HINTS: Record<ResourceId, string> = {
   coal: 'Fuel for the forge and the blast furnace. Mined from coal veins, or scraped off dead monsters.',
-  stone: 'Rubble from mining and refining. Pays for crude towers, gate repairs and stone gun shots.',
+  stone: 'Rubble from mining and refining. Pays for crude towers, gate repairs and stone gun shots. Raw ore cannot substitute.',
   ironOre: 'Raw rock. Break it at the anvil to get crushed iron.',
   copperOre: 'Raw rock. Break it at the anvil to get crushed copper.',
   crushedIron: 'Ready for the forge. Smelt with coal into iron ingots.',
@@ -387,11 +400,11 @@ export const VEIN_LABELS: Record<NodeKind, string> = {
   coal: 'Coal vein',
 };
 
-// What actually comes out of a vein per swing: mostly the promised resource,
-// with stone rubble and the odd stray mineral mixed in.
+// What actually comes out of a vein per swing. Iron and copper veins cross-yield
+// each other 25% of the time; coal still sheds stone rubble.
 export const VEIN_YIELDS: Record<NodeKind, { primary: ResourceId; primaryChance: number; stoneChance: number; strays: ResourceId[] }> = {
-  iron: { primary: 'ironOre', primaryChance: 0.75, stoneChance: 0.15, strays: ['coal', 'copperOre'] },
-  copper: { primary: 'copperOre', primaryChance: 0.75, stoneChance: 0.15, strays: ['coal', 'ironOre'] },
+  iron: { primary: 'ironOre', primaryChance: 0.75, stoneChance: 0, strays: ['copperOre'] },
+  copper: { primary: 'copperOre', primaryChance: 0.75, stoneChance: 0, strays: ['ironOre'] },
   coal: { primary: 'coal', primaryChance: 0.8, stoneChance: 0.2, strays: [] },
 };
 

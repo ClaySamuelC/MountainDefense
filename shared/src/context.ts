@@ -220,8 +220,7 @@ export function getContext(w: WorldState, p: PlayerState): WorkContext | null {
 }
 
 function crudeForRepair(w: WorldState): boolean {
-  if (w.stockpile.stone > 0.1) return true;
-  return w.spendOre && (w.stockpile.ironOre > 0.1 || w.stockpile.copperOre > 0.1);
+  return w.stockpile.stone > 0.1;
 }
 
 /** Seconds of held work per completed unit, or null for Instant/continuous work. */

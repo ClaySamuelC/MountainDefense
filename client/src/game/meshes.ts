@@ -1122,10 +1122,10 @@ export function makeWorkBar(): {
  * Inverted-hull glow outline for an interactable object. Clones the target's
  * meshes, flips them inside out, and tints them gold.
  */
-export function makeOutline(source: THREE.Group): THREE.Group {
+export function makeOutline(source: THREE.Group, color = '#ffd76a'): THREE.Group {
   const outline = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({
-    color: '#ffd76a',
+    color,
     side: THREE.BackSide,
     transparent: true,
     opacity: 0.85,

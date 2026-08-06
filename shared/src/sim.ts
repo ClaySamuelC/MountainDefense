@@ -132,9 +132,6 @@ function handleQueued(w: WorldState, queued: QueuedIntent[], ev: SimEvent[]) {
       case 'beat':
         handleBeat(w, p, ev);
         break;
-      case 'toggleOreSpend':
-        w.spendOre = !w.spendOre;
-        break;
       case 'build':
         handleBuild(w, intent.kind, intent.tier, intent.x, intent.z, ev);
         break;
@@ -405,10 +402,8 @@ function handleBuild(
   ev.push({ type: 'built', x, z });
 }
 
-function handleResearch(w: WorldState, p: PlayerState, tech: TechId) {
+function handleResearch(w: WorldState, _p: PlayerState, tech: TechId) {
   if (w.research || w.techs[tech].unlocked) return;
-  const hub = w.buildings.find((b) => b.type === 'techhub');
-  if (!hub || Math.hypot(p.x - hub.x, p.z - hub.z) > 6) return;
   const def = TECHS[tech];
   if (!canAfford(w, def.cost)) return;
   pay(w, def.cost);
@@ -723,7 +718,7 @@ function tickCarts(w: WorldState, inputs: Map<string, PlayerInput>, ev?: SimEven
     } else if (push === 0 && Math.abs(gravityA) < 0.45) {
       c.v = 0;
     }
-    c.v = Math.min(11, Math.max(-11, c.v));
+    c.v = Math.min(13, Math.max(-13, c.v));
     c.s += c.v * DT;
 
     // Soft buffers: leave room for the trailing ore cart at the mine end,

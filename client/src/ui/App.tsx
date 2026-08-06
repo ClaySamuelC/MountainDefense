@@ -1,10 +1,11 @@
-import { useEffect, useRef, useSyncExternalStore, useState } from 'react';
+import { useEffect, useRef, useSyncExternalStore, useState, type CSSProperties } from 'react';
 import {
   CARRY_CAP,
   FURNACE_CAP,
   FURNACE_CHARGE,
   RESOURCE_HINTS,
   RESOURCE_NAMES,
+  RESOURCE_SHORT,
   RESOURCE_STAGE,
   STAGE_LABELS,
   STATION_RECIPES,
@@ -27,10 +28,13 @@ import {
   type WorldState,
 } from '@shared';
 import { beatHud, store, type UIState } from './store';
-import { ResIcon } from './icons';
+import { ResIcon, RES_UI } from './icons';
 import { sfx } from '../game/sfx';
+import { peekSave } from '../net/save';
 
-/** Render a cost bag, including the special stone-or-ore 'crude' entry. */
+declare const __APP_VERSION__: string;
+
+/** Render a cost bag (`crude` is shown as stone). */
 function CostChips({ cost, w }: { cost: Cost; w?: WorldState }) {
   return (
     <span className="cost">
@@ -38,9 +42,8 @@ function CostChips({ cost, w }: { cost: Cost; w?: WorldState }) {
         const short = w ? !canAfford(w, { [r]: n } as Cost) : false;
         if (r === 'crude') {
           return (
-            <span key={r} className={short ? 'short' : ''} title="Payable with stone, or raw ore">
+            <span key={r} className={short ? 'short' : ''} title={RESOURCE_NAMES.stone}>
               <ResIcon id="stone" size={14} /> {n}
-              <em className="crude-hint">stone/ore</em>
             </span>
           );
         }
@@ -64,6 +67,10 @@ function send(intent: Parameters<NonNullable<ReturnType<typeof store.transport>>
 
 export interface AppCallbacks {
   onSolo: () => void;
+  onContinue: () => void;
+  onSave: () => void;
+  onDeleteSave: () => void;
+  hasSave: () => boolean;
   onHost: () => void;
   onJoin: (code: string) => void;
   onLeave: () => void;
@@ -92,31 +99,71 @@ const MENU_KEYS: [string, string][] = [
 
 function Menu({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
   const [code, setCode] = useState('');
+  const [saveRev, setSaveRev] = useState(0);
+  const save = peekSave();
+  void saveRev;
   return (
     <div className="menu-bg">
       <div className="menu panel">
         <div className="menu-crest">⛏</div>
         <h1>MOUNTAIN DEFENSE</h1>
         <p className="tagline">Mine by day. Hold the wall by night.</p>
-        <button className="btn primary" onClick={cb.onSolo}>
-          Solo Expedition
+        <p className="menu-version">v{__APP_VERSION__}</p>
+        {save && (
+          <button className="btn primary" onClick={cb.onContinue}>
+            Continue
+            <span className="btn-sub">{save.label}</span>
+          </button>
+        )}
+        <button
+          className={`btn ${save ? '' : 'primary'}`}
+          onClick={() => {
+            if (
+              save &&
+              !window.confirm('Start a new expedition? Playing will overwrite your current save.')
+            ) {
+              return;
+            }
+            cb.onSolo();
+          }}
+        >
+          {save ? 'New Solo Expedition' : 'Solo Expedition'}
         </button>
+        {save && (
+          <button
+            className="btn small ghost"
+            onClick={() => {
+              if (window.confirm('Delete the saved expedition?')) {
+                cb.onDeleteSave();
+                setSaveRev((n) => n + 1);
+              }
+            }}
+          >
+            Clear save
+          </button>
+        )}
         <div className="menu-row">
           <button className="btn" onClick={cb.onHost}>
             Host Co-op
           </button>
           <div className="join-row">
             <input
-              placeholder="room code"
+              placeholder="4-digit code"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && code && cb.onJoin(code)}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              onKeyDown={(e) => e.key === 'Enter' && code.length === 4 && cb.onJoin(code)}
             />
-            <button className="btn" disabled={!code} onClick={() => cb.onJoin(code)}>
+            <button className="btn" disabled={code.length !== 4} onClick={() => cb.onJoin(code)}>
               Join
             </button>
           </div>
         </div>
+        <p className="menu-coop-note">
+          Co-op is peer-to-peer — host stays in the game and shares the 4-digit room code.
+        </p>
         {ui.connectError && <p className="error">{ui.connectError}</p>}
         <div className="controls-hint">
           {MENU_KEYS.map(([k, label]) => (
@@ -204,15 +251,7 @@ function Hud({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
 
       <div className="action-bar hud-clickable">
         <button
-          className={`btn small toggle ${w.spendOre ? '' : 'off'}`}
-          title="When OFF, raw ore is reserved for refining: crude tower builds, repairs and the stone gun burn stone only."
-          onClick={() => send({ type: 'toggleOreSpend' })}
-        >
-          <span className="dot" />
-          Spend ore: {w.spendOre ? 'ON' : 'OFF'}
-        </button>
-        <button
-          className={`btn small ${ui.buildOpen ? 'active' : ''}`}
+          className={`btn small ${ui.buildOpen ? 'active' : ''} ${ui.guide.build ? 'hint-pulse' : ''}`}
           onClick={() => store.set({ buildOpen: !ui.buildOpen, techOpen: false })}
         >
           Build <kbd>B</kbd>
@@ -243,13 +282,14 @@ function Hud({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
 
       {ui.buildOpen && <BuildMenu ui={ui} />}
       {ui.techOpen && <TechPanel ui={ui} />}
-      {ui.showHint && (
+      {ui.introTip && <IntroTip text={ui.introTip} />}
+      {ui.showHint && !ui.introTip && (
         <div className="hint">
           <kbd>WASD</kbd> move · <kbd>E</kbd> work / beat · <strong>Space on the beat</strong> ·{' '}
           <kbd>F</kbd> ride cart · <kbd>Q</kbd> stone gun · <kbd>P</kbd> pause
         </div>
       )}
-      {ui.paused && <PauseMenu cb={cb} />}
+      {ui.paused && <PauseMenu cb={cb} ui={ui} />}
       {w.gameOver && (
         <div className="overlay">
           <div className="panel gameover">
@@ -267,9 +307,24 @@ function Hud({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
   );
 }
 
-function PauseMenu({ cb }: { cb: AppCallbacks }) {
+function IntroTip({ text }: { text: string }) {
+  return (
+    <button
+      type="button"
+      className="intro-tip hud-clickable"
+      onClick={() => store.set({ introTip: null })}
+    >
+      <strong>First day</strong>
+      <p>{text}</p>
+      <span className="intro-tip-dismiss">Click to dismiss</span>
+    </button>
+  );
+}
+
+function PauseMenu({ cb, ui }: { cb: AppCallbacks; ui: UIState }) {
   const [vol, setVol] = useState(() => sfx.getVolume());
   const [muted, setMuted] = useState(() => sfx.muted);
+  const solo = ui.mode === 'solo';
   return (
     <div className="overlay pause-overlay">
       <div className="panel pause-panel hud-clickable">
@@ -315,12 +370,24 @@ function PauseMenu({ cb }: { cb: AppCallbacks }) {
           >
             Resume
           </button>
+          {solo && (
+            <button
+              className="btn"
+              onClick={() => {
+                sfx.ui();
+                cb.onSave();
+              }}
+            >
+              Save expedition
+            </button>
+          )}
           <button className="btn" onClick={cb.onLeave}>
             Leave expedition
           </button>
         </div>
         <p className="fine">
           <kbd>P</kbd> or <kbd>Esc</kbd> to resume
+          {solo ? ' · solo autosaves' : ''}
         </p>
       </div>
     </div>
@@ -478,20 +545,39 @@ function ResourceRail({ w }: { w: WorldState }) {
         <div className="res-group" key={g.stage} data-stage={g.stage}>
           <span className="res-group-label">{STAGE_LABELS[g.stage as keyof typeof STAGE_LABELS]}</span>
           <div className="res-group-items">
-            {g.items.map((r) => (
-              <div className="res-chip hud-clickable" key={r}>
-                <ResIcon id={r} />
-                <span className="res-num">{Math.floor(w.stockpile[r])}</span>
-                <div className="tip">
-                  <div className="tip-head">
-                    <ResIcon id={r} size={20} />
-                    <strong>{RESOURCE_NAMES[r]}</strong>
-                    <span className="tip-count">{Math.floor(w.stockpile[r])}</span>
+            {g.items.map((r) => {
+              const tint = RES_UI[r];
+              return (
+                <div
+                  className="res-chip hud-clickable"
+                  key={r}
+                  data-res={r}
+                  style={
+                    {
+                      '--res-face': tint.face,
+                      '--res-deep': tint.deep,
+                      '--res-glow': tint.glow,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="res-icon-wrap">
+                    <ResIcon id={r} size={22} />
+                  </span>
+                  <span className="res-meta">
+                    <span className="res-tag">{RESOURCE_SHORT[r]}</span>
+                    <span className="res-num">{Math.floor(w.stockpile[r])}</span>
+                  </span>
+                  <div className="tip">
+                    <div className="tip-head">
+                      <ResIcon id={r} size={24} />
+                      <strong>{RESOURCE_NAMES[r]}</strong>
+                      <span className="tip-count">{Math.floor(w.stockpile[r])}</span>
+                    </div>
+                    <p>{RESOURCE_HINTS[r]}</p>
                   </div>
-                  <p>{RESOURCE_HINTS[r]}</p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
@@ -840,10 +926,7 @@ function TechPanel({ ui }: { ui: UIState }) {
   const branches: ('mining' | 'refining' | 'defense')[] = ['mining', 'refining', 'defense'];
   return (
     <div className="panel side-panel wide">
-      <h3>
-        Tech Hub
-        {!ui.nearTechHub && <span className="fine warn">walk to the blue crystal to research</span>}
-      </h3>
+      <h3>Research</h3>
       {branches.map((br) => (
         <div key={br}>
           <h4>{BRANCH_LABEL[br]}</h4>
@@ -872,7 +955,7 @@ function TechPanel({ ui }: { ui: UIState }) {
                     <CostChips cost={def.cost} w={w} />
                     <button
                       className="btn small"
-                      disabled={t.unlocked || researching || busy || !affordable || !ui.nearTechHub}
+                      disabled={t.unlocked || researching || busy || !affordable}
                       onClick={() => send({ type: 'research', tech: id })}
                     >
                       {t.unlocked
